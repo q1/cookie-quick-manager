@@ -76,6 +76,24 @@ Fixture entry points:
 
 `lvh.me` and its subdomains resolve to `127.0.0.1`, which makes them convenient for domain/subdomain cookie testing.
 
+## Focused Chromium QA
+
+Run the current automated Chromium regression checks:
+
+```bash
+npm run qa:chromium
+```
+
+The script loads the unpacked MV3 extension into Playwright Chromium and verifies:
+
+* fixture seeding on the QA site
+* domain listing in the manager UI
+* protected-cookie restoration
+* cookie editing
+* JSON export/import round-trip
+* secure cookie creation on HTTPS
+* Chromium options behavior (including hidden Firefox-only FPI control)
+
 
 # Features
 

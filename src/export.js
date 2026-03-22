@@ -294,7 +294,7 @@ function build_domain_dump(cookie) {
         '{ISSECURE}': get_secure_status(false),
         '{ISSECURE_RAW}': get_secure_status(true),
         '{ISHTTPONLY_RAW}': cookie.httpOnly,
-        '{SAMESITE_RAW}': cookie.sameSite ? cookie.sameSite : "no_restriction",
+        '{SAMESITE_RAW}': cookie.sameSite ? cookie.sameSite : "unspecified",
         '{ISDOMAIN}': get_domain_status(false),
         '{ISDOMAIN_RAW}': cookie.hostOnly,
         '{STORE_RAW}': cookie.storeId,
@@ -392,7 +392,7 @@ function parseNETSCAPEFile(content) {
  * NOTE: About default values. The netscape format is less rich than the JSON format,
  * thus some features of the cookies are lost and are replaced by default values when inserting.
  *
- * - sameSite: 'no_restriction'.
+ * - sameSite: omitted / browser default.
  * - httpOnly: false (cookie accessible from JS code).
  * - storeId: current selected context.
  * - firstPartyDomain: empty string (No way to know which is the FPI domain).
@@ -506,7 +506,10 @@ function parseJSONFile(content) {
                 };
 
                 if (json_cookie["SameSite raw"] !== undefined) {
-                    params['sameSite'] = json_cookie["SameSite raw"];
+                    let sameSite = json_cookie["SameSite raw"];
+
+                    if (sameSite !== "unspecified" && !(sameSite == "no_restriction" && !params.secure))
+                        params['sameSite'] = sameSite;
                 }
 
                 if (json_cookie["Store raw"] !== undefined) {
