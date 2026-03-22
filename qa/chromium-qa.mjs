@@ -125,6 +125,64 @@ async function run() {
         });
 
         await clickDomainAndCookie(managerPage, 'lvh.me', 'fixture_js_host');
+        await managerPage.locator('#auto_actualize_checkbox').click();
+        await fixturePage.evaluate(() => {
+            document.cookie = 'fixture_auto_refresh=auto-refresh; Path=/';
+        });
+        await managerPage.waitForTimeout(1000);
+        const autoRefreshCookies = await managerPage.locator('#cookie-list li').evaluateAll((nodes) => {
+            return nodes.map((node) => node.textContent.trim());
+        });
+        assert(autoRefreshCookies.some((text) => text.includes('fixture_auto_refresh')), 'Auto-refresh did not pick up a new same-domain cookie.');
+        results.push({
+            check: 'auto-refresh',
+            status: 'passed',
+            details: autoRefreshCookies,
+        });
+        await managerPage.locator('#auto_actualize_checkbox').click();
+        await fixturePage.evaluate(() => {
+            document.cookie = 'fixture_auto_refresh=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        });
+        await managerPage.waitForTimeout(500);
+
+        await managerPage.locator('#query-subdomains').check();
+        await managerPage.locator('#actualize_button').click();
+        await managerPage.waitForTimeout(800);
+        const groupedDomains = await managerPage.evaluate(() => {
+            return [...document.querySelectorAll('#domain-list li')].map((node) => ({
+                domain: node.childNodes[0]?.textContent?.trim() || node.textContent.trim(),
+                count: node.querySelector('.badge')?.textContent?.trim() || '',
+            }));
+        });
+        assert(groupedDomains.length === 1 && groupedDomains[0].domain === 'lvh.me', `Subdomain grouping produced unexpected domains: ${JSON.stringify(groupedDomains)}`);
+        results.push({
+            check: 'group-subdomains',
+            status: 'passed',
+            details: groupedDomains,
+        });
+
+        await managerPage.locator('#query-subdomains').uncheck();
+        await managerPage.locator('#search_domain').fill('lvh.me :name:"fixture_js_domain"');
+        await managerPage.locator('#actualize_button').click();
+        await managerPage.waitForTimeout(800);
+        const filteredByName = await managerPage.evaluate(() => {
+            return {
+                domains: [...document.querySelectorAll('#domain-list li')].map((node) => node.childNodes[0]?.textContent?.trim() || node.textContent.trim()),
+                cookies: [...document.querySelectorAll('#cookie-list li')].map((node) => node.textContent.trim()),
+            };
+        });
+        assert(filteredByName.cookies.length === 1 && filteredByName.cookies[0].includes('fixture_js_domain'), `Name filter did not isolate the expected cookie: ${JSON.stringify(filteredByName)}`);
+        results.push({
+            check: 'search-filter-by-name',
+            status: 'passed',
+            details: filteredByName,
+        });
+
+        await managerPage.locator('#search_domain').fill('lvh.me');
+        await managerPage.locator('#actualize_button').click();
+        await managerPage.waitForTimeout(800);
+
+        await clickDomainAndCookie(managerPage, 'lvh.me', 'fixture_js_host');
         await managerPage.locator('#protect_button').click();
 
         await fixturePage.bringToFront();
@@ -261,6 +319,20 @@ async function run() {
             check: 'options-hide-fpi',
             status: 'passed',
             details: 'FPI control hidden on Chromium',
+        });
+
+        const initialDeletionAlert = await optionsPage.locator('#display_deletion_alert').isChecked();
+        await optionsPage.locator('#display_deletion_alert').setChecked(!initialDeletionAlert);
+        await optionsPage.reload({waitUntil: 'domcontentloaded'});
+        const persistedDeletionAlert = await optionsPage.locator('#display_deletion_alert').isChecked();
+        assert(persistedDeletionAlert === !initialDeletionAlert, 'display_deletion_alert option did not persist after reload.');
+        results.push({
+            check: 'options-persistence',
+            status: 'passed',
+            details: {
+                initialDeletionAlert,
+                persistedDeletionAlert,
+            },
         });
 
         console.log(JSON.stringify({

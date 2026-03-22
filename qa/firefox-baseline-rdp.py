@@ -162,6 +162,73 @@ def main():
             "details": json.loads(manager_state),
         })
 
+        grouped_domains = client.evaluate(
+            frame["consoleActor"],
+            """(() => {
+                document.querySelector('#query-subdomains').click();
+                return 'ok';
+            })()""",
+        )
+        time.sleep(1)
+        _, frame = get_selected_target(client)
+        grouped_domains = client.evaluate(
+            frame["consoleActor"],
+            """JSON.stringify({
+                domains: [...document.querySelectorAll('#domain-list li')].map(li => ({
+                    domain: (li.childNodes[0]?.textContent || li.textContent).trim(),
+                    count: li.querySelector('.badge')?.textContent?.trim() || ''
+                }))
+            })""",
+        )
+        results.append({
+            "check": "group-subdomains",
+            "status": "passed",
+            "details": json.loads(grouped_domains),
+        })
+        grouped_domains_data = json.loads(grouped_domains)
+        if not (len(grouped_domains_data["domains"]) == 1 and grouped_domains_data["domains"][0]["domain"] == "lvh.me"):
+            raise RuntimeError(f"Unexpected grouped Firefox domains: {grouped_domains_data}")
+
+        filtered_by_name = client.evaluate(
+            frame["consoleActor"],
+            """(() => {
+                document.querySelector('#query-subdomains').click();
+                document.querySelector('#search_domain').value = 'lvh.me :name:"fixture_js_domain"';
+                document.querySelector('#actualize_button').click();
+                return 'ok';
+            })()""",
+            timeout=10,
+        )
+        time.sleep(1)
+        _, frame = get_selected_target(client)
+        filtered_by_name = client.evaluate(
+            frame["consoleActor"],
+            """JSON.stringify({
+                domains: [...document.querySelectorAll('#domain-list li')].map(li => (li.childNodes[0]?.textContent || li.textContent).trim()),
+                cookies: [...document.querySelectorAll('#cookie-list li')].map(li => li.textContent.trim())
+            })""",
+            timeout=10,
+        )
+        results.append({
+            "check": "search-filter-by-name",
+            "status": "passed",
+            "details": json.loads(filtered_by_name),
+        })
+        filtered_by_name_data = json.loads(filtered_by_name)
+        if not (
+            len(filtered_by_name_data["cookies"]) == 1
+            and "fixture_js_domain" in filtered_by_name_data["cookies"][0]
+        ):
+            raise RuntimeError(f"Unexpected Firefox name-filter result: {filtered_by_name_data}")
+
+        client.evaluate(
+            frame["consoleActor"],
+            "document.querySelector('#search_domain').value = 'lvh.me'; document.querySelector('#actualize_button').click(); 'ok'",
+            timeout=10,
+        )
+        time.sleep(1)
+        _, frame = get_selected_target(client)
+
         client.evaluate(
             frame["consoleActor"],
             "[...document.querySelectorAll('#domain-list li')].find(li => (li.childNodes[0]?.textContent || li.textContent).trim()==='lvh.me').click(); 'ok'",

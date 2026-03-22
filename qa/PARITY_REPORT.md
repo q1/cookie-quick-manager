@@ -56,6 +56,9 @@ Passing checks:
 
 * fixture seeding
 * manager domain listing
+* auto-refresh when a same-domain cookie is created outside the manager
+* subdomain grouping
+* search filtering by cookie name
 * protected-cookie restoration after page-driven deletion
 * cookie editing
 * JSON export
@@ -64,6 +67,7 @@ Passing checks:
 * JSON import round-trip
 * secure cookie creation on HTTPS
 * hidden Firefox-only FPI control on Chromium options page
+* representative options persistence
 
 Latest successful result set:
 
@@ -73,6 +77,9 @@ Latest successful result set:
   "results": [
     {"check": "fixture-seeding", "status": "passed"},
     {"check": "manager-domain-list", "status": "passed"},
+    {"check": "auto-refresh", "status": "passed"},
+    {"check": "group-subdomains", "status": "passed"},
+    {"check": "search-filter-by-name", "status": "passed"},
     {"check": "protected-cookie-restore", "status": "passed"},
     {"check": "edit-cookie", "status": "passed"},
     {"check": "export-cookie-json", "status": "passed"},
@@ -80,7 +87,8 @@ Latest successful result set:
     {"check": "delete-cookie", "status": "passed"},
     {"check": "import-cookie-json", "status": "passed"},
     {"check": "create-secure-cookie", "status": "passed"},
-    {"check": "options-hide-fpi", "status": "passed"}
+    {"check": "options-hide-fpi", "status": "passed"},
+    {"check": "options-persistence", "status": "passed"}
   ]
 }
 ```
@@ -100,6 +108,8 @@ Passing checks:
 * fixture seeding
 * manager page opens
 * manager lists seeded `.lvh.me` and `lvh.me` domains
+* subdomain grouping collapses host/domain variants into one grouped domain
+* name-based search filtering isolates the expected cookie
 * host-only cookie can be selected from the manager
 * single-cookie protection state can be normalized to locked
 * protected host cookie survives page-driven deletion after the protection state is normalized
@@ -112,6 +122,8 @@ Latest successful result set:
   "results": [
     {"check": "fixture-seeding", "status": "passed"},
     {"check": "manager-domain-list", "status": "passed"},
+    {"check": "group-subdomains", "status": "passed"},
+    {"check": "search-filter-by-name", "status": "passed"},
     {"check": "select-host-cookie", "status": "passed"},
     {"check": "protect-state-normalized", "status": "passed"},
     {"check": "protected-cookie-delete-from-page-js", "status": "passed"}
@@ -125,10 +137,14 @@ Latest successful result set:
 
 * manager page opens successfully in both Firefox baseline and Chromium port
 * seeded host-only/domain cookies are visible in the manager
+* subdomain grouping matches between Firefox baseline and Chromium
+* name-based search filtering matches between Firefox baseline and Chromium
 * single-cookie protection works and prevents page-driven deletion
+* auto-refresh works in Chromium for same-domain external cookie mutations
 * cookie edit flow works in Chromium
 * JSON export/import round-trip works in Chromium
 * secure cookie creation works in Chromium on HTTPS fixtures
+* representative options persistence works in Chromium
 
 ### Intentional Chromium substitutions
 
@@ -156,10 +172,14 @@ These are follow-up QA opportunities rather than known failures.
 The Chromium port now has strong evidence for core parity on the most critical user-facing workflows:
 
 * cookie discovery/listing
+* search filtering
+* subdomain grouping
+* auto-refresh
 * single-cookie editing
 * single-cookie protection and restore behavior
 * JSON import/export
 * secure cookie creation
+* representative options persistence
 * Chromium-specific platform substitutions documented clearly
 
 At this point, the Chromium MV3 port is in good shape for a parity-first release candidate, with deeper modernization intentionally deferred until after this parity pass.
