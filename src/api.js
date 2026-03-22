@@ -749,6 +749,22 @@ vAPI.getTabCookieStoreId = function(tabId) {
     });
 }
 
+vAPI.defaultStoreId = function() {
+    return vAPI.default_stores[0].cookieStoreId;
+}
+
+vAPI.privateStoreId = function() {
+    return vAPI.default_stores[1].cookieStoreId;
+}
+
+vAPI.isDefaultStoreId = function(storeId) {
+    return storeId === vAPI.defaultStoreId();
+}
+
+vAPI.isPrivateStoreId = function(storeId) {
+    return storeId === vAPI.privateStoreId();
+}
+
 /*********** Global variables ***********/
 
 // Private attribute, see vAPI.storesAllowed

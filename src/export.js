@@ -502,7 +502,7 @@ function parseJSONFile(content) {
                     path: json_cookie["Path raw"],
                     httpOnly: (json_cookie["HTTP only raw"] === 'true'),
                     secure: (json_cookie["Send for raw"] === 'true'),
-                    storeId: (json_cookie["Private raw"]  === 'true') ? 'firefox-private' : 'firefox-default',
+                    storeId: (json_cookie["Private raw"]  === 'true') ? vAPI.privateStoreId() : vAPI.defaultStoreId(),
                 };
 
                 if (json_cookie["SameSite raw"] !== undefined) {
