@@ -1,0 +1,14 @@
+{
+  "name": "cookie-quick-manager",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Chromium MV3 build tooling for Cookie Quick Manager",
+  "scripts": {
+    "clean": "rm -rf build",
+    "build": "npm run clean && mkdir -p build/static/js && cp -R src/* build/ && cp LICENSE build/ && cp node_modules/webextension-polyfill/dist/browser-polyfill.min.js build/static/js/browser-polyfill.min.js",
+    "package": "npm run build && mkdir -p dist && (cd build && zip -qr ../dist/cookie_quick_manager-chromium.zip .)"
+  },
+  "devDependencies": {
+    "webextension-polyfill": "^0.12.0"
+  }
+}
