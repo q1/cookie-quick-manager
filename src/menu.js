@@ -43,7 +43,6 @@
                 element.onclick = function () {
                     // Search cookies for a domain: Send current url
                     let createData = {
-                        type: "panel",
                         url: "cookies.html?parent_url=" + encodeURIComponent(current_tab.url),
                     };
                     createWindow(createData);
@@ -54,7 +53,6 @@
                 element.onclick = function () {
                     // Just launch the addon: Send empty url
                     let createData = {
-                        type: "panel",
                         url: "cookies.html?parent_url=",
                     };
                     createWindow(createData);
@@ -67,7 +65,7 @@
                     // Note: delete_cookies() closes the window
                     let params = {
                         url: current_tab.url,
-                        storeId: current_tab.cookieStoreId,
+                        storeId: current_store_id,
                     };
                     delete_cookies(params);
                 }
@@ -96,7 +94,7 @@
 
                         // Delete
                         let params = {
-                            storeId: current_tab.cookieStoreId,
+                            storeId: current_store_id,
                         };
                         delete_cookies(params);
                     });
@@ -107,7 +105,11 @@
                 element.onclick = function () {
                     // Purge LocalStore for the current domain
                     // NOTE: subdomains will not be taken into account
-                    let prom = browser.browsingData.removeLocalStorage({hostnames: [(new URL(current_tab.url)).hostname,]});
+                    let prom = browser.browsingData.remove({
+                        origins: [(new URL(current_tab.url)).origin,]
+                    }, {
+                        localStorage: true,
+                    });
                     prom.then((ret) => {
                         // Force the closing of the window
                         window.close();
@@ -135,18 +137,10 @@
 
     function delete_cookies(params) {
         // Delete cookies according the given filter
-        browser.runtime.getBrowserInfo().then((browser_info) => {
-            // TODO: reuse params from initialization: avoid getBrowserInfo() call
-
-            // Detect Firefox version:
-            // -> firstPartyDomain argument is available on Firefox 59+=
-            // {name: "Firefox", vendor: "Mozilla", version: "60.0.1", buildID: ""}
-            let version = browser_info.version.split('.')[0];
-            if (parseInt(version, 10) >= 59)
+        if (vAPI.supportsFirstPartyIsolation)
                 params['firstPartyDomain'] = null;
 
-            return vAPI.delete_cookies(browser.cookies.getAll(params));
-        })
+        vAPI.delete_cookies(browser.cookies.getAll(params))
         .then((ret) => {
             // Force the closing of the window
             window.close();
@@ -194,13 +188,43 @@
             // TODO: why it is not ok on some computers with small resolution ?
             createData.width = width;
             createData.height = height;
+            createData.type = "popup";
 
             // Create window
             createData.url += "&type=window";
             let new_window = browser.windows.create(createData);
             new_window.then(() => {
-                console.log("The panel has been created");
+                console.log("The window has been created");
             });
+        });
+    }
+
+    function isSupportedSiteUrl(raw_url) {
+        try {
+            let current_url = new URL(raw_url);
+            return current_url.protocol === 'http:' || current_url.protocol === 'https:';
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function hide_site_actions() {
+        document.querySelector('#search_cookie_manager').style.display = 'none';
+        document.querySelector('#delete_current_cookies').style.display = 'none';
+        document.querySelector('#delete_context_cookies').style.display = 'none';
+        document.querySelector('#delete_current_localstorage').style.display = 'none';
+    }
+
+    function get_local_storage_count(tab_id) {
+        return browser.scripting.executeScript({
+            target: {tabId: tab_id},
+            func: () => window.localStorage.length,
+        })
+        .then((result) => {
+            if (!result.length)
+                return 0;
+
+            return result[0].result;
         });
     }
 
@@ -228,6 +252,11 @@
             // Set the global var with current tab
             current_tab = tabs[0];
 
+            if (!current_tab) {
+                hide_site_actions();
+                return;
+            }
+
             // Display a shortcut to search cookies for the current domain
             let a = document.querySelector('#search_cookie_manager');
             // Workaround for domains without favicon
@@ -236,54 +265,41 @@
             let img = document.createElement("img");
             img.src = favIconUrl;
             img.className = 'favicon';
-            let content = document.createTextNode((new URL(current_tab.url)).hostname);
+            let current_url = new URL(current_tab.url);
+            let displayed_name = current_url.hostname || current_tab.title || current_tab.url;
+            let content = document.createTextNode(displayed_name);
             a.prepend(img);
             a.appendChild(content);
 
+            if (!isSupportedSiteUrl(current_tab.url)) {
+                hide_site_actions();
+                return;
+            }
+
             // Display a shortcut to delete all cookies for the current domain & store
             // Display a shortcut to delete LocalStorage
-            browser.runtime.getBrowserInfo().then((browser_info) => {
+            vAPI.getTabCookieStoreId(current_tab.id).then((store_id) => {
+                current_store_id = store_id;
 
-                // Detect Firefox version:
-                // {name: "Firefox", vendor: "Mozilla", version: "60.0.1", buildID: ""}
-                let version = parseInt(browser_info.version.split('.')[0], 10);
-
-                // -> LocalStorage and indexedDB is not available on Firefox 56
-                // removalOptions.hostnames is available since FF 58
-                if (version >= 58) {
-                    // Display the shortcut for localstorage deletion
-                    let a = document.querySelector('#delete_current_localstorage');
-
-                    // Get the number of localstorage items
-                    browser.tabs.executeScript({
-                        code: "(function (){return localStorage.length;})();"
-                    }).then((ret) => {
-                        // Display the number of items
-                        let content = document.createTextNode(" (" + ret[0] + ")");
-                        a.appendChild(content);
-                    }, (err) => {
-                        console.log('init_ui: content script:', err);
-                        // Display the number of items
-                        let content = document.createTextNode(" (0)");
-                        a.appendChild(content);
-                    });
-                } else {
-                    let a = document.querySelector('#delete_current_localstorage');
-                    a.style['display'] = 'None';
-                }
-
-                /////////////////////////////////////////////////////////////////
+                let a = document.querySelector('#delete_current_localstorage');
+                get_local_storage_count(current_tab.id).then((local_storage_count) => {
+                    let content = document.createTextNode(" (" + local_storage_count + ")");
+                    a.appendChild(content);
+                }, (err) => {
+                    console.log('init_ui: content script:', err);
+                    let content = document.createTextNode(" (0)");
+                    a.appendChild(content);
+                });
 
                 let params_current_cookies = {
                     url: current_tab.url,
-                    storeId: current_tab.cookieStoreId,
+                    storeId: current_store_id,
                 };
                 let params_context_cookies = {
-                    storeId: current_tab.cookieStoreId,
+                    storeId: current_store_id,
                 };
 
-                // -> firstPartyDomain argument is available on Firefox 59+=
-                if (version >= 59) {
+                if (vAPI.supportsFirstPartyIsolation) {
                     params_current_cookies['firstPartyDomain'] = null;
                     params_context_cookies['firstPartyDomain'] = null;
                 }
@@ -317,6 +333,7 @@
     /*********** Global variables ***********/
 
     var current_tab;
+    var current_store_id;
     var cookies_context_number;
 
 }));

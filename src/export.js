@@ -364,37 +364,30 @@ function handleUploadedFile(content, mimetype) {
     // Take a file content and dispatch it to the good parser
     // Handle errors due to parsers.
 
-    browser.runtime.getBrowserInfo().then((browser_info) => {
+    let cookies_promises;
 
-        // Detect Firefox version:
-        // -> sameSite attribute is available on Firefox 63+=
-        // {name: "Firefox", vendor: "Mozilla", version: "60.0.1", buildID: ""}
-        let firefox_version = parseInt(browser_info.version.split('.')[0], 10);
-        let cookies_promises;
+    // Detect format based on MimeType: JSON or Netscape
+    if (mimetype == "application/json")
+        cookies_promises = parseJSONFile(content);
+    else if (mimetype == "text/plain")
+        cookies_promises = parseNETSCAPEFile(content);
+    else {
+        console.error("handleUploadedFile:: MimeType not supported", mimetype);
+        return;
+    }
 
-        // Detect format based on MimeType: JSON or Netscape
-        if (mimetype == "application/json")
-            cookies_promises = parseJSONFile(content, firefox_version);
-        else if (mimetype == "text/plain")
-            cookies_promises = parseNETSCAPEFile(content, firefox_version);
-        else {
-            console.error("handleUploadedFile:: MimeType not supported", mimetype);
-            return;
-        }
-
-        cookies_promises.then((promises) => {
-            add_cookies(promises);
-        }, (error) => {
-            // Parser error (JSON)
-            set_info_text(browser.i18n.getMessage("cookieRestoredError", error));
-            $('#modal_info').modal('show');
-        }).catch((error) => {
-            console.error("Unexpected error:", error);
-        });
+    cookies_promises.then((promises) => {
+        add_cookies(promises);
+    }, (error) => {
+        // Parser error (JSON)
+        set_info_text(browser.i18n.getMessage("cookieRestoredError", error));
+        $('#modal_info').modal('show');
+    }).catch((error) => {
+        console.error("Unexpected error:", error);
     });
 }
 
-function parseNETSCAPEFile(content, firefox_version) {
+function parseNETSCAPEFile(content) {
 /* Parse Netscape file and return a list of cookies.set promises.
  * NOTE: About default values. The netscape format is less rich than the JSON format,
  * thus some features of the cookies are lost and are replaced by default values when inserting.
@@ -481,7 +474,7 @@ function parseNETSCAPEFile(content, firefox_version) {
     });
 }
 
-function parseJSONFile(content, firefox_version) {
+function parseJSONFile(content) {
     // Parse JSON file and return a list of cookies.set promises.
 
     return new Promise((resolve, reject) => {
@@ -512,8 +505,7 @@ function parseJSONFile(content, firefox_version) {
                     storeId: (json_cookie["Private raw"]  === 'true') ? 'firefox-private' : 'firefox-default',
                 };
 
-                // -> sameSite attribute is available on Firefox 63+=
-                if (firefox_version >= 63 && json_cookie["SameSite raw"] !== undefined) {
+                if (json_cookie["SameSite raw"] !== undefined) {
                     params['sameSite'] = json_cookie["SameSite raw"];
                 }
 
