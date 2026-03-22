@@ -94,6 +94,25 @@ The script loads the unpacked MV3 extension into Playwright Chromium and verifie
 * secure cookie creation on HTTPS
 * Chromium options behavior (including hidden Firefox-only FPI control)
 
+## Firefox baseline parity check
+
+To compare against the old Firefox build:
+
+1. Extract / launch the baseline extension with `web-ext`, for example:
+
+```bash
+unzip -q -o dist/cookie_quick_manager-0.5rc2.zip -d qa/firefox-baseline-extension
+npx web-ext run --source-dir=qa/firefox-baseline-extension --firefox=/usr/bin/firefox --start-url=http://lvh.me:4173/ --no-input
+```
+
+2. In another terminal, run the remote-debugging parity probe:
+
+```bash
+python3 qa/firefox-baseline-rdp.py
+```
+
+See `qa/PARITY_REPORT.md` for the latest recorded parity summary.
+
 
 # Features
 

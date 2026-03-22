@@ -45,7 +45,7 @@
   },
 
   "cStore": {
-    "message": "Kontext ",
+    "message": "Store ",
     "description": "Attribute of a cookie in the details panel."
   },
 
@@ -85,7 +85,7 @@
   },
 
   "selectQueryContexts": {
-    "message": "Kontext(e):",
+    "message": "Store(s):",
     "description": "Text for search engine describing the content of the drop-down list of stores."
   },
 
@@ -203,7 +203,7 @@
   },
 
   "contextMenu_domain_copy2container": {
-    "message": "In Container kopieren",
+    "message": "In Store kopieren",
     "description": "Option for the contextual menu that opens on a domain."
   },
 
@@ -249,8 +249,8 @@
   },
 
   "tooltip_cStore": {
-    "message": "Browsing-Kontext<br>Wähle einen Kontext, um sicher zu stellen, dass der Cookie darin erreichbar ist.",
-    "description": "Select menu to modify the context of the current cookie (private/default/etc.)."
+    "message": "Cookie-Store<br>Wähle einen Store, um zu steuern, wo der Cookie verfügbar ist.",
+    "description": "Select menu to modify the store of the current cookie (private/default/etc.)."
   },
 
   "tooltip_cHttpOnly": {
@@ -284,7 +284,7 @@
   },
 
   "tooltipQueryContexts": {
-    "message": "Kontexte werden verwendet um gespeicherte Daten nach Online-Aktivitäten zu separieren, ohne die Browser History zu löschen, die Verbindung zu trennen und wiederzuverbinden, oder verschiedene Browser zu verwenden.",
+    "message": "Stores sind vom Browser verwaltete Cookie-Bereiche. Chromium bietet normalerweise den Standard-Store und – falls aktiviert – einen getrennten privaten Store.",
     "description": "Text for search engine describing the content of the drop-down list of stores."
   },
 
@@ -346,7 +346,7 @@
   },
 
   "modalMenuAlertContent": {
-    "message": "Ihre Aktion löscht alle Cookies aus dem aktuellen Navigationskontext($cookie_number$)!\nWillst du weiter machen?",
+    "message": "Ihre Aktion löscht alle Cookies aus dem aktuellen Store ($cookie_number$)!\nMöchten Sie fortfahren?",
     "description": "Content of the modal JS alert when a user is about to delete all visible cookies.",
     "placeholders": {
       "cookie_number" : {
@@ -464,7 +464,7 @@
   },
 
   "oDisplay_deletion_alert": {
-    "message": " Zeigen Sie eine Warnung an, bevor Sie Cookies aus dem gesamten Browserkontext entfernen (Schaltfläche \"Alle löschen\" oder \"Aktuelle Kontext-Cookies löschen\" Popup-Menüeintrag)",
+    "message": " Zeigen Sie eine Warnung an, bevor Sie Cookies aus ganzen Store(s) entfernen (Schaltfläche \"Alle löschen\" oder Popup-Menüeintrag \"Aktuelle Store-Cookies löschen\")",
     "description": "Settings page: Checkbox"
   },
 
@@ -596,8 +596,8 @@
   },
 
   "popupDeleteContextCookies": {
-    "message": "Cookies aus dem Kontext löschen",
-    "description": "Popup menu: Delete current Context Cookies"
+    "message": "Aktuelle Store-Cookies löschen",
+    "description": "Popup menu: Delete current Store Cookies"
   },
 
   "popupDeleteCurrentLocalStorage": {
