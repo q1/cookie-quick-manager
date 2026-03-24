@@ -324,8 +324,8 @@
   },
 
   "tooltipADelete": {
-    "message": "Supprimer tous les cookies du contexte sélectionné",
-    "description": "Button to delete all the cookies in the selected context."
+    "message": "Supprimer tous les cookies du store sélectionné",
+    "description": "Button to delete all the cookies in the selected store."
   },
 
   "tooltipcontributeContent": {
@@ -586,6 +586,11 @@
   "oDelCurrentCookie": {
     "message": "Supprimer le cookie courant",
     "description": "Keyboard shortcut description: suppr"
+  },
+
+  "oDelCurrentStoreCookies": {
+    "message": "Supprimer tous les cookies du store sélectionné",
+    "description": "Keyboard shortcut description: ctrl+D"
   },
 
   "oSearchDomain": {
