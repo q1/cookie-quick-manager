@@ -3,6 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
+    <script src="static/js/browser-polyfill.min.js"></script>
+    <script src="platform.js"></script>
     <link rel="stylesheet" href="static/css/bootstrap.min.css">
     <link rel="icon" href="icons/icon48.png"/>
     <title>Cookie Quick Manager - Options</title>
@@ -163,7 +165,7 @@
             </div>
             <div class="form-group row">
               <input type="checkbox" name="display_deletion_alert" id="display_deletion_alert">
-              <label for="display_deletion_alert" data-i18n-content="oDisplay_deletion_alert"> Display an alert before removing cookies from entire browsing context(s) <br>(<em>Delete all</em> button or <em>Delete Current Context cookies</em> popup menu entry)</label>
+              <label for="display_deletion_alert" data-i18n-content="oDisplay_deletion_alert"> Display an alert before removing cookies from entire store(s) <br>(<em>Delete all</em> button or <em>Delete Current Store cookies</em> popup menu entry)</label>
             </div>
             <h2 data-i18n-content="oExport">Export</h2>
             <div class="form-group row">
@@ -350,12 +352,12 @@
                 <li>Various UI fixs</li>
                 <li>Add lock badge on cookie-list for those which are protecte</li>
                 <li>Add buttons in popup menu: delete current cookies &amp; clear LocalStorage; new permission browsingdata is required</li>
-                <li>Quick selector to search cookies in specific containers</li></li>
+                <li>Quick selector to search cookies in specific stores/containers</li></li>
             </ul>
             <span>0.2rc3</span>
             <ul>
-                <li>Add badges corresponding to the containers for each domain &amp; cookie</li>
-                <li>Add select menu for stores/containers in cookie details</li>
+                <li>Add badges corresponding to the stores/containers for each domain &amp; cookie</li>
+                <li>Add select menu for stores in cookie details</li>
                 <li>API for containers in FF57+</li>
             </ul>
           </div>
@@ -377,7 +379,7 @@
               </tr>
               <tr>
                 <td><kbd>ctrl + D</kbd>, <kbd>⌘ + D</kbd>, <kbd>⊞ + D</kbd></td>
-                <td data-i18n-content="oDelCurrentCookie">Delete all the cookie of the selected context</td>
+                <td data-i18n-content="oDelCurrentStoreCookies">Delete all cookies of the selected store</td>
               </tr>
               <tr>
                 <td><kbd>ctrl + F</kbd>, <kbd>⌘ + F</kbd>,<br><kbd>⊞ + F</kbd></td>

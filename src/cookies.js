@@ -545,6 +545,90 @@ $('#domain-list').contextMenu({
         // this callback is executed every time the menu is to be shown
         // its results are destroyed every time the menu is hidden
         // e is the original contextmenu event, containing e.pageX and e.pageY (amongst other data)
+        let items = {
+            "copy": {name: browser.i18n.getMessage("contextMenu_domain_copy2Clipboard"), icon: "copy",
+                callback: function(itemKey, opt, rootMenu, originalEvent) {
+                    // Export to clipboard all cookies in the selected domain
+                    let promise = vAPI.filter_cookies(vAPI.getCookiesFromSelectedDomain());
+                    window.display_json_in_clipboard_area(promise);
+                    $('#modal_clipboard').modal("show");
+                    vAPI.ask_permission('clipboardWrite');
+                }
+            },
+            "save": {name: browser.i18n.getMessage("contextMenu_domain_copy2File"), icon: "save",
+                callback: function(itemKey, opt, rootMenu, originalEvent) {
+                    // Export to file all cookies in the selected domain
+                    let promise = vAPI.filter_cookies(vAPI.getCookiesFromSelectedDomain());
+                    promise.then((cookies) => {
+                        // Make 1 json for each cookie and store it
+                        // Merge and display templates
+                        window.export_content_to_file_wrapper(cookies);
+                    }, (error) => {
+                        // No cookie
+                        console.log({message: "No domain selected", error: error});
+                    });
+                }
+            },
+            "protect": {name: browser.i18n.getMessage("contextMenu_domain_protect"), icon: "lock",
+                callback: function(itemKey, opt, rootMenu, originalEvent) {
+                    // Protect all cookies in the selected domain and update the UI
+                    // by clicking on the current domain
+                    set_cookie_protection(
+                        vAPI.getCookiesFromSelectedDomain(),
+                        true,
+                        $(this)
+                    );
+                }
+            },
+            "protect_session": {name: browser.i18n.getMessage("contextMenu_domain_protect_session"), icon: "lock",
+                callback: function(itemKey, opt, rootMenu, originalEvent) {
+                    // Protect all cookies in the selected domain and update the UI
+                    // by clicking on the current domain
+                    set_cookie_protection(
+                        vAPI.getCookiesFromSelectedDomain(),
+                        true,
+                        $(this),
+                        true
+                    );
+                }
+            },
+            "unprotect": {name: browser.i18n.getMessage("contextMenu_domain_unprotect"), icon: "unlock",
+                callback: function(itemKey, opt, rootMenu, originalEvent) {
+                    // Unprotect all cookies in the selected domain and update the UI
+                    // by clicking on the current domain
+                    set_cookie_protection(
+                        vAPI.getCookiesFromSelectedDomain(),
+                        false,
+                        $(this)
+                    );
+                }
+            },
+            "unprotect_session": {name: browser.i18n.getMessage("contextMenu_domain_unprotect_session"), icon: "unlock",
+                callback: function(itemKey, opt, rootMenu, originalEvent) {
+                    // Unprotect all cookies in the selected domain and update the UI
+                    // by clicking on the current domain
+                    set_cookie_protection(
+                        vAPI.getCookiesFromSelectedDomain(),
+                        false,
+                        $(this),
+                        false
+                    );
+                }
+            },
+            "delete": {name: browser.i18n.getMessage("contextMenu_domain_delete"), icon: "trash",
+                callback: function(itemKey, opt, rootMenu, originalEvent) {
+                    // Remove all cookies in the selected domain
+                    // TODO #delete_domain_button n'existe plus
+                    delete_cookies(vAPI.filter_cookies(vAPI.getCookiesFromSelectedDomain()), "#delete_domain_button span");
+                }
+            },
+            "sep1": "---------",
+            "quit": {name: browser.i18n.getMessage("buttonClose"), icon: function($element, key, item){ return 'context-menu-icon context-menu-icon-quit'; }}
+        };
+
+        if (context_menu_elements)
+            items["contexts_selector"] = context_menu_elements;
+
         return {
             callback: function(key, options) {
                 // WARNING: curious inversion: name of item is in options instead of key
@@ -563,87 +647,7 @@ $('#domain-list').contextMenu({
                     $(this).trigger('click', true);
                 }, null);
             },
-            items: {
-                "copy": {name: browser.i18n.getMessage("contextMenu_domain_copy2Clipboard"), icon: "copy",
-                    callback: function(itemKey, opt, rootMenu, originalEvent) {
-                        // Export to clipboard all cookies in the selected domain
-                        let promise = vAPI.filter_cookies(vAPI.getCookiesFromSelectedDomain());
-                        window.display_json_in_clipboard_area(promise);
-                        $('#modal_clipboard').modal("show");
-                        vAPI.ask_permission('clipboardWrite');
-                    }
-                },
-                "save": {name: browser.i18n.getMessage("contextMenu_domain_copy2File"), icon: "save",
-                    callback: function(itemKey, opt, rootMenu, originalEvent) {
-                        // Export to file all cookies in the selected domain
-                        let promise = vAPI.filter_cookies(vAPI.getCookiesFromSelectedDomain());
-                        promise.then((cookies) => {
-                            // Make 1 json for each cookie and store it
-                            // Merge and display templates
-                            window.export_content_to_file_wrapper(cookies);
-                        }, (error) => {
-                            // No cookie
-                            console.log({message: "No domain selected", error: error});
-                        });
-                    }
-                },
-                "protect": {name: browser.i18n.getMessage("contextMenu_domain_protect"), icon: "lock",
-                    callback: function(itemKey, opt, rootMenu, originalEvent) {
-                        // Protect all cookies in the selected domain and update the UI
-                        // by clicking on the current domain
-                        set_cookie_protection(
-                            vAPI.getCookiesFromSelectedDomain(),
-                            true,
-                            $(this)
-                        );
-                    }
-                },
-                "protect_session": {name: browser.i18n.getMessage("contextMenu_domain_protect_session"), icon: "lock",
-                    callback: function(itemKey, opt, rootMenu, originalEvent) {
-                        // Protect all cookies in the selected domain and update the UI
-                        // by clicking on the current domain
-                        set_cookie_protection(
-                            vAPI.getCookiesFromSelectedDomain(),
-                            true,
-                            $(this),
-                            true
-                        );
-                    }
-                },
-                "unprotect": {name: browser.i18n.getMessage("contextMenu_domain_unprotect"), icon: "unlock",
-                    callback: function(itemKey, opt, rootMenu, originalEvent) {
-                        // Unprotect all cookies in the selected domain and update the UI
-                        // by clicking on the current domain
-                        set_cookie_protection(
-                            vAPI.getCookiesFromSelectedDomain(),
-                            false,
-                            $(this)
-                        );
-                    }
-                },
-                "unprotect_session": {name: browser.i18n.getMessage("contextMenu_domain_unprotect_session"), icon: "unlock",
-                    callback: function(itemKey, opt, rootMenu, originalEvent) {
-                        // Unprotect all cookies in the selected domain and update the UI
-                        // by clicking on the current domain
-                        set_cookie_protection(
-                            vAPI.getCookiesFromSelectedDomain(),
-                            false,
-                            $(this),
-                            false
-                        );
-                    }
-                },
-                "delete": {name: browser.i18n.getMessage("contextMenu_domain_delete"), icon: "trash",
-                    callback: function(itemKey, opt, rootMenu, originalEvent) {
-                        // Remove all cookies in the selected domain
-                        // TODO #delete_domain_button n'existe plus
-                        delete_cookies(vAPI.filter_cookies(vAPI.getCookiesFromSelectedDomain()), "#delete_domain_button span");
-                    }
-                },
-                "contexts_selector": context_menu_elements,
-                "sep1": "---------",
-                "quit": {name: browser.i18n.getMessage("buttonClose"), icon: function($element, key, item){ return 'context-menu-icon context-menu-icon-quit'; }}
-            }
+            items: items
         };
     }
 });
@@ -681,6 +685,9 @@ $('[my-data-toogle="dropdown_and_tooltip"]').each(function() {
 });
 
 firefox57_workaround_for_blank_panel();
+
+if (!vAPI.supportsFirstPartyIsolation)
+    $('#fpi-domain').closest('.form-group').hide();
 
 // Set default domain in search box
 setDefaultDomain();
@@ -912,6 +919,11 @@ function showStores(stores) {
                 name: store.name,
             };
         });
+
+        if (Object.keys(elements).length <= 1) {
+            context_menu_elements = null;
+            return;
+        }
 
         context_menu_elements = {
             name: browser.i18n.getMessage("contextMenu_domain_copy2container"),
@@ -1250,7 +1262,7 @@ function showDomains(storeIds) {
 
             // Display store badge if the cookie comes from a special store/container
             for (let storeId of domains[domain_name].storeIds) {
-                if (storeId == 'firefox-default')
+                if (vAPI.isDefaultStoreId(storeId))
                     continue;
                 let store = storesData[storeId];
                 li.appendChild(
@@ -1353,7 +1365,7 @@ function showCookiesList(event, refresh_domain_badges) {
                 content.append(":" + cookie.value);
 
                 // Display badge if cookie comes from a special store
-                if (cookie.storeId != 'firefox-default') {
+                if (!vAPI.isDefaultStoreId(cookie.storeId)) {
                     let store = storesData[cookie.storeId];
                     li.appendChild(
                         get_store_badge_element(store.colorCode, store.iconUrl, store.name, 'cookie-badge')
@@ -1431,7 +1443,7 @@ function display_cookie_details(event) {
 
     // Fill the fields
     $('#domain').val(cookie.domain);
-    $('#fpi-domain').val(cookie.firstPartyDomain);
+    $('#fpi-domain').val(cookie.firstPartyDomain || "");
     $('#name').val(cookie.name);
     $('#value').val(cookie.value);
     $('#path').val(cookie.path);
@@ -1596,7 +1608,7 @@ function update_selected_domain_badges() {
     let store_id;
     $current_cookies.each(function (index) {
         store_id = $(this).data('cookie').storeId;
-        if ((store_id != 'firefox-default') && (unique.indexOf(store_id) === -1)) {
+        if ((!vAPI.isDefaultStoreId(store_id)) && (unique.indexOf(store_id) === -1)) {
             unique.push(store_id);
         }
     });

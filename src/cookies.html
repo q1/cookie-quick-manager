@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
+    <script src="static/js/browser-polyfill.min.js"></script>
     <link rel="stylesheet" href="static/css/bootstrap.min.css">
     <link rel="stylesheet" href="static/css/bootstrap-datetimepicker.min.css">
     <link rel="stylesheet" href="static/js/jquery.contextMenu.min.css">
@@ -190,7 +191,7 @@
         line-height: 14px;
       }
       .glyphicon-store {
-        /* Used to display icons of stores/containers
+        /* Used to display icons of stores
         background-color and mask rules are dynamic */
         height: 14px;
         width: 14px;
@@ -334,9 +335,9 @@
           <!-- Select store -->
           <div class="navbar-left">
             <span data-toggle="tooltip" data-placement="bottom"
-            title="Contexts are used to separate storage data by online activities without having to clear the browsing history, disconnect and reconnect, or use different browsers."
+            title="Stores are browser-managed cookie jars. Chromium normally exposes the default store and, when enabled, a separate private browsing store."
             data-i18n-title="tooltipQueryContexts"
-            data-i18n-content="selectQueryContexts">Context(s):</span>
+            data-i18n-content="selectQueryContexts">Store(s):</span>
             <select tabindex="5" class="form-control" id="search_store"></select>
           </div>
           <!-- Refresh the view -->
@@ -423,7 +424,7 @@
             <div class="form-group row">
               <label id="select_store" class="col-sm-2 col-form-label" for="store"
               data-html="true" data-toggle="tooltip" data-placement="auto left"
-              title="Browsing context<br>Select a context to make sure that the cookie is accessible in it." data-i18n-title="tooltip_cStore" data-i18n-content="cStore">Context </label>
+              title="Cookie store<br>Select a store to control where the cookie is accessible." data-i18n-title="tooltip_cStore" data-i18n-content="cStore">Store </label>
               <div class="col-sm-10">
                 <select class="form-control" id="store">
                 </select>
@@ -447,6 +448,7 @@
                 title="Partial protection against the risks associated with Cross-Site Request Forgery (CSRF) and Cross-Site Script Inclusion (XSSI) attacks.<br>The strict mode allows an application to warn the browser that the cookie should only be sent if the request originates from the website the cookie came from, and not from a third party website." data-i18n-title="tooltip_cSameSite">sameSite </label>
                 <div class="col-sm-6">
                   <select class="form-control" id="samesite">
+                    <option value="unspecified">Unspecified</option>
                     <option value="no_restriction">No restriction</option>
                     <option value="lax">Lax</option>
                     <option value="strict">Strict</option>
@@ -495,7 +497,7 @@
         <div class="col-sm-8">
           <!-- Buttons -->
           <button type="button" class="btn btn-default" id="ask_total_deletion_button" data-toggle="tooltip"
-          title="Delete all the cookies of the selected context" data-i18n-title="tooltipADelete"><span class="glyphicon glyphicon-trash"></span></button>
+          title="Delete all the cookies of the selected store" data-i18n-title="tooltipADelete"><span class="glyphicon glyphicon-trash"></span></button>
           <div class="dropup dropup-custom">
             <button type="button" class="btn btn-default dropdown-toggle"
             data-toggle="dropdown" my-data-toogle="dropdown_and_tooltip" data-i18n-title="menu_tooltip_dropup_protect" tooltip-title="Protect/Unprotect all the cookies"><span class="glyphicon glyphicon-lock"></span><span class="caret"></span></button>
@@ -587,7 +589,7 @@
       </div>
     </div>
 
-    <!-- Modal overlay used to display the alert when a user is about to delete all cookies from a context -->
+    <!-- Modal overlay used to display the alert when a user is about to delete all cookies from a store -->
     <div id="modal_alert" class="modal fade" role="dialog">
       <div class="modal-dialog">
         <!-- Modal content-->
@@ -614,6 +616,7 @@
     <script src="static/js/moment-2.19.3.min.js"></script>
     <script src="static/js/bootstrap-datetimepicker-4.17.47.min.js"></script>
     <script src="static/js/jquery.contextMenu-3.0.0-beta.1.min.js"></script>
+    <script src="platform.js"></script>
     <script src="api.js"></script>
     <script src="cookies.js"></script>
     <script src="export.js"></script>

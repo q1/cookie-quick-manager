@@ -205,18 +205,10 @@
         // Display features according to the capacities of the browser
 
         // First-Party Isolation
-        vAPI.FPI_detection(browser.runtime.getBrowserInfo()).then((browser_info) => {
-            // Detect Firefox version:
-            // -> firstPartyDomain argument is available on Firefox 59+=
-            // -> privacy.firstparty.isolate is available on Firefox 58 but we don't want it
-            // since we can't handle these cookies on this browser.
-            // {name: "Firefox", vendor: "Mozilla", version: "60.0.1", buildID: ""}
-            let version = browser_info.version.split('.')[0];
-
-            if ((vAPI.FPI === undefined) || (parseInt(version, 10) < 59)) {
-                // Firefox 58-=
-                // FPI is not available or we don't want it
-                $('#fpi_status').prop('disabled', true);
+        vAPI.FPI_detection().then(() => {
+            if (vAPI.FPI === undefined) {
+                // FPI is not available on Chromium.
+                $('#fpi_status').closest('.form-group').hide();
             } else {
                 // Display FPI status
                 $('#fpi_status').prop('checked', vAPI.FPI);

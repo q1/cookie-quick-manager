@@ -1,3 +1,7 @@
 dist/
 build/
+node_modules/
+qa/certs/
+qa/firefox-baseline-extension/
+.playwright-cqm-profile/
 poc/

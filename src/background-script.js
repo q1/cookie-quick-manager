@@ -49,6 +49,57 @@ function onError(error) {
     console.log({"Error removing/saving cookie:": error});
 }
 
+function get_cookie_restore_key(cookie) {
+    return [
+        cookie.domain,
+        cookie.path,
+        cookie.name,
+        cookie.storeId,
+        cookie.firstPartyDomain || '',
+    ].join('::');
+}
+
+function is_protected_cookie(cookie) {
+    return !(protected_cookies[cookie.domain] === undefined ||
+        protected_cookies[cookie.domain].indexOf(cookie.name) === -1);
+}
+
+function build_cookie_restore_params(cookie) {
+    let params = {
+        url: vAPI.getHostUrl(cookie),
+        name: cookie.name,
+        value: cookie.value,
+        path: cookie.path,
+        httpOnly: cookie.httpOnly,
+        secure: cookie.secure,
+        storeId: cookie.storeId,
+    };
+
+    if (cookie.expirationDate !== undefined)
+        params.expirationDate = cookie.expirationDate;
+
+    if (cookie.firstPartyDomain !== undefined)
+        params.firstPartyDomain = cookie.firstPartyDomain;
+
+    return params;
+}
+
+function schedule_cookie_restore(cookie) {
+    let cookie_restore_key = get_cookie_restore_key(cookie);
+
+    if (restore_timers[cookie_restore_key] !== undefined)
+        clearTimeout(restore_timers[cookie_restore_key]);
+
+    restore_timers[cookie_restore_key] = setTimeout(() => {
+        delete restore_timers[cookie_restore_key];
+
+        let promise = browser.cookies.set(build_cookie_restore_params(cookie));
+        promise.then((restored_cookie) => {
+            console.log({"Erasure protection: Cookie NOT deleted!:": restored_cookie});
+        }, onError);
+    }, 150);
+}
+
 function init_options() {
     // Get & set options from storage
     // Init protected_cookies array in global context
@@ -101,41 +152,17 @@ browser.cookies.onChanged.addListener(function(changeInfo) {
      */
 
     // Do not protect the cookie if website protection is not enabled
-    if (prevent_protected_cookies_deletion && changeInfo.removed && changeInfo.cause == 'explicit') {
+    if (!prevent_protected_cookies_deletion || !changeInfo.removed)
+        return;
 
-        // If the deleted cookie is not in protected_cookies array: do nothing
-        if (protected_cookies[changeInfo.cookie.domain] === undefined ||
-            protected_cookies[changeInfo.cookie.domain].indexOf(changeInfo.cookie.name) === -1)
-            return;
+    // Ignore remove events emitted as part of a regular cookie update.
+    if (changeInfo.cause == 'overwrite')
+        return;
 
-        // Rebuild the cookie given by the event
-        let params = {
-            url: vAPI.getHostUrl(changeInfo.cookie),
-            name: changeInfo.cookie.name,
-            value: changeInfo.cookie.value,
-            path: changeInfo.cookie.path,
-            httpOnly: changeInfo.cookie.httpOnly,
-            secure: changeInfo.cookie.secure,
-            storeId: changeInfo.cookie.storeId,
-        };
+    if (!is_protected_cookie(changeInfo.cookie))
+        return;
 
-        // Handle session cookies (if session there is no expirationDate)
-        if (changeInfo.cookie.expirationDate !== undefined)
-            params.expirationDate = changeInfo.cookie.expirationDate;
-
-        // Handle FPI flag if present
-        if (changeInfo.cookie.firstPartyDomain !== undefined)
-            params.firstPartyDomain = changeInfo.cookie.firstPartyDomain;
-
-        let promise = browser.cookies.set(params);
-        promise.then((cookie) => {
-            console.log({"Erasure protection: Cookie NOT deleted!:": cookie});
-            // Increment counter of protected cookies on the toolbar icon
-            // TODO: 1 counter per tab ? or add clearer information.. Is this option useful ?
-            //protected_cookies_counter++;
-            //browser.browserAction.setBadgeText({text: String(protected_cookies_counter)});
-        }, onError);
-    }
+    schedule_cookie_restore(changeInfo.cookie);
 });
 
 browser.storage.onChanged.addListener(function (changes, area) {
@@ -160,6 +187,7 @@ browser.storage.onChanged.addListener(function (changes, area) {
 //var protected_cookies_counter = 0;
 var protected_cookies;
 var prevent_protected_cookies_deletion;
+var restore_timers = {};
 
 init_options();
 // Set default color of the counter of protected cookies on the toolbar icon

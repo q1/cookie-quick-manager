@@ -184,30 +184,16 @@ vAPI.get_all_cookies = function(storeIds) {
         if ((storeIds === undefined) || (storeIds[0] === 'all'))
             storeIds = vAPI.storeIds;
 
-        browser.runtime.getBrowserInfo().then(function(browser_info) {
-            // Get 1 promise for each cookie store for each domain
-            // Each promise stores all associated cookies
+        let promises = [];
+        for (let storeId of storeIds) {
+            let details = {storeId: storeId};
+            if (vAPI.supportsFirstPartyIsolation)
+                details.firstPartyDomain = null;
 
-            // Detect Firefox version:
-            // -> firstPartyDomain argument is available on Firefox 59+=
-            // {name: "Firefox", vendor: "Mozilla", version: "60.0.1", buildID: ""}
-            let version = browser_info.version.split('.')[0];
-
-            let promises = [];
-            if (parseInt(version, 10) >= 59) {
-                // Add firstPartyDomain argument to getAll() function
-                for (let storeId of storeIds) {
-                    promises.push(browser.cookies.getAll({storeId: storeId, firstPartyDomain: null}));
-                }
-            } else {
-                // Legacy getAll() function
-                for (let storeId of storeIds) {
-                    promises.push(browser.cookies.getAll({storeId: storeId}));
-                }
-            }
-            // Merge all promises
-            return Promise.all(promises);
-        })
+            promises.push(browser.cookies.getAll(details));
+        }
+        // Merge all promises
+        Promise.all(promises)
         .then((cookies_array) => {
             // Merge all results of promises
             let cookies = Array.prototype.concat(...cookies_array);
@@ -249,8 +235,10 @@ vAPI.get_stores = function() {
     // TODO make a function to acess to vAPI.storeIds as private attribute
 
     return new Promise((resolve, reject) => {
+        let allowed_incognito_access = false;
 
-        browser.extension.isAllowedIncognitoAccess().then((allowed_incognito_access) => {
+        browser.extension.isAllowedIncognitoAccess().then((allowed) => {
+            allowed_incognito_access = allowed;
             //console.log("get_stores:: allowed incognito access?", allowed_incognito_access);
             //console.log({default_stores: vAPI.default_stores});
 
@@ -263,28 +251,59 @@ vAPI.get_stores = function() {
                 vAPI.storesAllowed = vAPI.default_stores;
             }
 
+            if (!vAPI.supportsContextualIdentities)
+                return browser.cookies.getAllCookieStores();
+
             // Query other contexts
             return browser.contextualIdentities.query({});
         })
-        .then((contexts) => {
+        .then((contexts_or_cookie_stores) => {
             // contexts === false on Firefox < 57
             // on FF57- contexts doesn't contain default stores: firefox-private or firefox-default
             //console.log({CONTEXTS: contexts});
 
-            // Init stores with default stores
-            let stores = vAPI.storesAllowed;
-            //console.log({storesAllowed: vAPI.storesAllowed});
+            let stores;
+            if (vAPI.supportsContextualIdentities) {
+                // Init stores with default stores
+                stores = vAPI.storesAllowed;
+                //console.log({storesAllowed: vAPI.storesAllowed});
 
-            if (contexts !== false) {
-                // Replace 'resource://usercontext-content' prefix in the urls of the context icons
-                // Due to unsolved bug https://bugzilla.mozilla.org/show_bug.cgi?id=1499000
-                for (let context of contexts) {
-                    context.iconUrl = context.iconUrl.replace(/resource:\/\/usercontext-content/, "icons");
+                if (contexts_or_cookie_stores !== false) {
+                    // Replace 'resource://usercontext-content' prefix in the urls of the context icons
+                    // Due to unsolved bug https://bugzilla.mozilla.org/show_bug.cgi?id=1499000
+                    for (let context of contexts_or_cookie_stores) {
+                        context.iconUrl = context.iconUrl.replace(/resource:\/\/usercontext-content/, "icons");
+                    }
+                    //console.log("CONTEXTS iconUrl replaced", contexts_or_cookie_stores);
+
+                    // On FF+=57 add containers from contexts
+                    stores = stores.concat(contexts_or_cookie_stores);
                 }
-                //console.log("CONTEXTS iconUrl replaced", contexts);
+            } else {
+                stores = contexts_or_cookie_stores.map((store) => {
+                    let isIncognitoStore = store.id === '1' || (vAPI.isIncognitoContext && store.id !== '0');
+                    let name = isIncognitoStore ?
+                        browser.i18n.getMessage("container_private") :
+                        browser.i18n.getMessage("container_default");
 
-                // On FF+=57 add containers from contexts
-                stores = stores.concat(contexts);
+                    if (!(store.id === '0' || store.id === '1'))
+                        name += ' (' + store.id + ')';
+
+                    return {
+                        name: name,
+                        icon: isIncognitoStore ? "private-browsing" : "circle",
+                        iconUrl: isIncognitoStore ? "icons/private-browsing.svg" : "",
+                        color: isIncognitoStore ? "purple" : "black",
+                        colorCode: isIncognitoStore ? "#af51f5" : "#555555",
+                        cookieStoreId: store.id,
+                    };
+                });
+
+                if (!allowed_incognito_access)
+                    stores = stores.filter((store) => store.cookieStoreId === '0');
+
+                if (!stores.length)
+                    stores = vAPI.storesAllowed;
             }
 
             // Get only storeIds
@@ -297,7 +316,7 @@ vAPI.get_stores = function() {
             resolve(stores);
 
         }, (error) => {
-            console.error(e);
+            console.error(error);
         });
     });
 }
@@ -308,6 +327,11 @@ vAPI.FPI_detection = function(promise) {
     // browser.cookies.* on browser that can support or not this new API.
     // vAPI.FPI is undefined if FPI is not supported by the browser,
     // or false/true if supported but disabled/enabled.
+
+    if (!vAPI.supportsFirstPartyIsolation) {
+        vAPI.FPI = undefined;
+        return Promise.resolve(promise);
+    }
 
     return new Promise((resolves, rejects) => {
         // This promise will crash on FF 59-
@@ -516,6 +540,10 @@ vAPI.getCookiesFromSelectedDomain = function() {
         // Workaround to get click event data of the selected domain
         // Get pure HTML document (not a JQuery one)
         var domain_obj = document.querySelector('#domain-list li.active');
+        if (!domain_obj) {
+            reject("SelectedDomain-NoDomain");
+            return;
+        }
         //console.log($._data(domain, "events" ));
         // Get data of the first click event registered
         var click_event_data = $._data(domain_obj, "events" ).click[0].data
@@ -523,52 +551,17 @@ vAPI.getCookiesFromSelectedDomain = function() {
         var storeIds = click_event_data.storeIds;
         // TODO: simulate multiple domains
         var domains = [domain, ];
+        let promises = [];
+        for (let domain of domains) {
+            for (let storeId of storeIds) {
+                let details = {domain: domain, storeId: storeId};
+                if (vAPI.supportsFirstPartyIsolation)
+                    details.firstPartyDomain = null;
 
-
-        browser.runtime.getBrowserInfo().then(function(browser_info) {
-            // Get 1 promise for each cookie store for each domain
-            // Each promise stores all associated cookies
-
-            // Detect Firefox version:
-            // Ex: {name: "Firefox", vendor: "Mozilla", version: "60.0.1", buildID: ""}
-            // -> firstPartyDomain argument is available on Firefox 59+=
-            // -> browser.cookies.getAll() can't be queried on Firefox 59+=
-            // with firstPartyDomain argument AND domain argument...
-            // So for users that need to edit FPI cookies, we simply return all domains
-            // filtered by forcing the checkbox query-subdomains to be unchecked.
-            // (if it is checked, we can't filter all the domains...)
-            // See https://bugzilla.mozilla.org/show_bug.cgi?id=1465063
-            let version = parseInt(browser_info.version.split('.')[0], 10);
-
-            var promises = [];
-            if (version >= 62) {
-                // Add firstPartyDomain argument to getAll() function
-                for (let domain of domains) {
-                    //console.log("getCookiesFromSelectedDomain: domain:", domain);
-                    for (let storeId of storeIds) {
-                        promises.push(browser.cookies.getAll({domain: domain, storeId: storeId, firstPartyDomain: null}));
-                    }
-                }
-            } else if ((version >= 59) && (version < 62)) {
-                // See explanations above.
-                // Force unchecked status, remove the checkbox from the UI...
-                let $query_subdomains_checkbox = $('#query-subdomains');
-                $query_subdomains_checkbox.prop('checked', false);
-                $query_subdomains_checkbox.parent().hide();
-
-                // Return all cookies from the stores. domains will be filtered in the next step below
-                return vAPI.get_all_cookies(storeIds);
-            } else {
-                // Legacy getAll() function
-                for (let domain of domains) {
-                    for (let storeId of storeIds) {
-                        promises.push(browser.cookies.getAll({domain: domain, storeId: storeId}));
-                    }
-                }
+                promises.push(browser.cookies.getAll(details));
             }
-            // Merge all promises
-            return Promise.all(promises);
-        })
+        }
+        Promise.all(promises)
         .then((cookies_array) => {
             // Merge all results of promises
             let cookies = Array.prototype.concat(...cookies_array);
@@ -673,6 +666,11 @@ vAPI.set_cookie_protection = function(cookies, protect_flag) {
 vAPI.setFirstPartyIsolateStatus = function(status) {
     // Set firstPartyIsolate status
 
+    if (!vAPI.supportsFirstPartyIsolation) {
+        console.log("First-Party Isolation is not supported by this browser");
+        return;
+    }
+
     var getting = browser.privacy.websites.firstPartyIsolate.get({});
     getting.then((got) => {
         //console.log({'got': got});
@@ -739,26 +737,6 @@ vAPI.remove_permission = function(permission_name) {
 
 /*********** Global variables ***********/
 
-// Private attribute, see vAPI.storesAllowed
-vAPI.default_stores = [
-    {
-        name: browser.i18n.getMessage("container_default"),
-        icon: "circle",
-        iconUrl: "",
-        color: "black",
-        colorCode: "#555555",
-        cookieStoreId: "firefox-default",
-    },
-    {
-        name: browser.i18n.getMessage("container_private"),
-        icon: "private-browsing",
-        iconUrl: "icons/private-browsing.svg",
-        color: "purple",
-        colorCode: "#af51f5",
-        cookieStoreId: "firefox-private",
-    },
-];
-
 // vAPI.default_stores without firefox-private if the extension is not allowed to access private windows
 // This attribute is "public" and should be used instead of vAPI.default_stores
 vAPI.storesAllowed = [];
@@ -812,4 +790,4 @@ vAPI.query_domain = "";
 vAPI.query_names;
 vAPI.query_values;
 
-})(this);
+})(globalThis);
