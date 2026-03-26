@@ -5,7 +5,7 @@
   "description": "Chromium MV3 build tooling for Cookie Quick Manager",
   "scripts": {
     "clean": "rm -rf build",
-    "build": "npm run clean && mkdir -p build/static/js && cp -R src/* build/ && cp LICENSE build/ && cp node_modules/webextension-polyfill/dist/browser-polyfill.min.js build/static/js/browser-polyfill.min.js",
+    "build": "npm run clean && mkdir -p build && cp -R src/* build/ && cp LICENSE build/",
     "package": "npm run build && mkdir -p dist && (cd build && zip -qr ../dist/cookie_quick_manager-chromium.zip .)",
     "fixture:cert": "bash qa/generate-dev-cert.sh",
     "fixture:start": "node qa/fixture-server.mjs",

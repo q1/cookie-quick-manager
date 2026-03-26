@@ -44,6 +44,18 @@ npm run build
 
 This creates a loadable unpacked extension in `build/`.
 
+## Load directly from `src/` during development
+
+The `src/` directory is also loadable as an unpacked extension now.
+
+If you want the simplest development loop, you can point Chrome directly at:
+
+```text
+/path/to/repo/src
+```
+
+This is useful when you want to test source changes without first generating `build/`.
+
 ## Load unpacked in Chromium
 
 1. Open `chrome://extensions`
