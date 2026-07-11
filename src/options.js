@@ -170,25 +170,9 @@
 
     function get_options() {
         // Load options from storage and update the interface
-        let get_settings = browser.storage.local.get({
-            delete_all_on_restart: false,
-            import_protected_cookies: false,
-            prevent_protected_cookies_deletion: true,
-            skin: 'default',
-            open_in_new_tab: true,
-            display_deletion_alert: true,
-            template: 'JSON',
-        });
+        let get_settings = browser.storage.local.get(core.getDefaultSettings());
         return get_settings.then((items) => {
-            items = Object.assign({
-                delete_all_on_restart: false,
-                import_protected_cookies: false,
-                prevent_protected_cookies_deletion: true,
-                skin: 'default',
-                open_in_new_tab: true,
-                display_deletion_alert: true,
-                template: 'JSON',
-            }, core.sanitizeSettings(items));
+            items = Object.assign(core.getDefaultSettings(), core.sanitizeSettings(items));
             //console.log({storage_data: items});
 
             // Update the interface
@@ -268,10 +252,12 @@
             for (const [domain, records] of Object.entries(protectedCookies)) {
                 const fieldset = document.createElement('fieldset');
                 const legend = document.createElement('legend');
+                const domainLabel = document.createElement('label');
                 const selectDomain = document.createElement('input');
                 selectDomain.type = 'checkbox';
                 const domainText = document.createTextNode(` ${domain} (${records.length})`);
-                legend.append(selectDomain, domainText);
+                domainLabel.append(selectDomain, domainText);
+                legend.appendChild(domainLabel);
                 fieldset.appendChild(legend);
 
                 const entries = [];

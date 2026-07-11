@@ -36,6 +36,14 @@ function createBackgroundHarness(options = {}) {
     };
     const calls = {cleanup: 0, sets: [], errors: []};
     let currentCookies = [];
+    let nextTimerId = 1;
+    const pendingTimers = new Map();
+    const scheduleTimer = (callback) => {
+        const id = nextTimerId++;
+        pendingTimers.set(id, callback);
+        return id;
+    };
+    const cancelTimer = (id) => pendingTimers.delete(id);
     const browser = {
         runtime: {
             id: 'test-extension',
@@ -71,7 +79,8 @@ function createBackgroundHarness(options = {}) {
         commit_cookie_protection: async () => ({}),
     };
     const context = vm.createContext({
-        browser, CQMCore: core, console, globalThis: null, setTimeout, clearTimeout, vAPI,
+        browser, CQMCore: core, console, globalThis: null,
+        setTimeout: scheduleTimer, clearTimeout: cancelTimer, vAPI,
     });
     context.globalThis = context;
     vm.runInContext(fs.readFileSync(path.resolve(__dirname, '../src/background-script.js'), 'utf8'), context);
@@ -79,6 +88,12 @@ function createBackgroundHarness(options = {}) {
         background: context.CQMBackground,
         calls,
         events,
+        async flushRestoreTimers() {
+            const callbacks = [...pendingTimers.values()];
+            pendingTimers.clear();
+            callbacks.forEach((callback) => callback());
+            await new Promise((resolve) => setImmediate(resolve));
+        },
         setCurrentCookie(value) { currentCookies = value ? [value] : []; },
         setCurrentCookies(value) { currentCookies = value; },
         targetCookie,
@@ -97,7 +112,7 @@ test('worker evaluation never performs startup cleanup', async () => {
 test('protected cookie restore preserves exact security and domain semantics', async () => {
     const harness = createBackgroundHarness({protected: true});
     await harness.background.handleCookieChange({removed: true, cause: 'explicit', cookie: harness.targetCookie});
-    await new Promise((resolve) => setTimeout(resolve, 190));
+    await harness.flushRestoreTimers();
     assert.equal(harness.calls.sets.length, 1);
     assert.equal(harness.calls.sets[0].sameSite, 'strict');
     assert.equal(harness.calls.sets[0].httpOnly, true);
@@ -117,7 +132,7 @@ test('a host/domain sibling does not suppress restoration of the exact protected
         cause: 'explicit',
         cookie: harness.targetCookie,
     });
-    await new Promise((resolve) => setTimeout(resolve, 190));
+    await harness.flushRestoreTimers();
     assert.equal(harness.calls.sets.length, 1);
     assert.equal(harness.calls.sets[0].domain, undefined);
     assert.equal(harness.calls.sets[0].value, 'old');
@@ -129,14 +144,14 @@ test('fresh cookie rotation cancels a pending stale restore', async () => {
     const freshCookie = {...harness.targetCookie, value: 'fresh'};
     harness.setCurrentCookie(freshCookie);
     await harness.background.handleCookieChange({removed: false, cause: 'explicit', cookie: freshCookie});
-    await new Promise((resolve) => setTimeout(resolve, 190));
+    await harness.flushRestoreTimers();
     assert.equal(harness.calls.sets.length, 0);
 });
 
 test('natural cookie expiry is not restored as an immortal session cookie', async () => {
     const harness = createBackgroundHarness({protected: true});
     await harness.background.handleCookieChange({removed: true, cause: 'expired', cookie: harness.targetCookie});
-    await new Promise((resolve) => setTimeout(resolve, 190));
+    await harness.flushRestoreTimers();
     assert.equal(harness.calls.sets.length, 0);
 });
 
@@ -147,7 +162,7 @@ test('website expiry tombstones restore protected cookies', async () => {
         cause: 'expired_overwrite',
         cookie: harness.targetCookie,
     });
-    await new Promise((resolve) => setTimeout(resolve, 190));
+    await harness.flushRestoreTimers();
     assert.equal(harness.calls.sets.length, 1);
 });
 

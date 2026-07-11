@@ -401,10 +401,10 @@
   },
 
   "cookieRestoredSingleError": {
-    "message": "Fehler, mindestens ein Cookie konnte nicht wiederhergestellt werden:<br>$error$<br>Keine Sorge; die meiste Zeit diese sind Session-Cookies, die abgelaufen sind.",
-    "description": "Alert when a file is imported with an error during the save process.",
+    "message": "$number$ Cookie(s) konnten nicht wiederhergestellt werden.",
+    "description": "Import result for cookies that the browser rejected.",
     "placeholders": {
-      "error" : {
+      "number" : {
         "content" : "$1"
       }
     }
@@ -603,6 +603,41 @@
   "popupSearch": {
     "message": "In Cookies suchen nach: ",
     "description": "Popup menu: Search and edit cookies in the main interface of CQM"
+  },
+
+  "cPartitionKey": {
+    "message": "Partitionsschlüssel",
+    "description": "Partition key field in the cookie details panel."
+  },
+
+  "oFpiLabel": {
+    "message": "First-Party-Isolation",
+    "description": "First-Party Isolation option label."
+  },
+
+  "oFpiAvailability": {
+    "message": "First-Party-Isolation ist nur verfügbar, wenn die Firefox-Datenschutz-API sie bereitstellt.",
+    "description": "First-Party Isolation availability notice."
+  },
+
+  "oFpiDescription": {
+    "message": "Die Einstellung firstPartyIsolate ordnet Drittanbieterdaten der Domain in der Adressleiste zu. Dies begrenzt websiteübergreifendes Tracking, kann aber Drittanbieter-Anmeldungen beeinträchtigen.",
+    "description": "Explanation of First-Party Isolation."
+  },
+
+  "oFpiMoreInfo": {
+    "message": "Weitere Informationen im",
+    "description": "Text before the First-Party Isolation documentation link."
+  },
+
+  "oFpiMdnLink": {
+    "message": "Mozilla Developer Network",
+    "description": "First-Party Isolation documentation link text."
+  },
+
+  "oFpiFirefoxOnly": {
+    "message": "Dieses Steuerelement ist nur in Firefox verfügbar und wird in Chromium ausgeblendet.",
+    "description": "Browser support notice for First-Party Isolation."
   },
 
   "popupDeleteCurrentCookies": {

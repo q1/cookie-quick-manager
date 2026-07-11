@@ -13,6 +13,14 @@ const outputDirectory = path.resolve(repositoryRoot, outputArgument);
 if (!['chromium', 'firefox'].includes(target))
     throw new Error(`Unknown build target: ${target}`);
 
+const approvedOutputDirectories = new Map([
+    ['chromium', path.join(repositoryRoot, 'build')],
+    ['firefox', path.join(repositoryRoot, 'build-firefox')],
+]);
+if (path.isAbsolute(outputArgument) || outputArgument.split(/[\\/]+/).includes('..') ||
+    outputDirectory !== approvedOutputDirectories.get(target))
+    throw new Error(`Unsafe build output for ${target}: ${outputArgument}`);
+
 await rm(outputDirectory, {recursive: true, force: true});
 await mkdir(outputDirectory, {recursive: true});
 

@@ -220,7 +220,8 @@ function build_cookie_dump() {
         firstPartyDomain: $('#fpi-domain').val(),
     };
     const selectedCookie = $('#cookie-list').find('li.active').data('cookie');
-    if (selectedCookie?.partitionKey)
+    if (selectedCookie?.partitionKey && selectedCookie.domain === cookie.domain &&
+        selectedCookie.name === cookie.name)
         cookie.partitionKey = selectedCookie.partitionKey;
 
     // If raw is true, return the unix timestamp if the cookie is not a session cookie
@@ -349,6 +350,7 @@ function export_content_to_file(content) {
     } else {
         cookie_filename = 'cookies.txt';
         cookie_filetype = 'text/plain';
+        content = `# Cookie Quick Manager Netscape v2\n${content}`;
     }
 
     var f = document.createElement('iframe');
@@ -409,12 +411,14 @@ async function parseNETSCAPEFile(content) {
     await vAPI.FPI_detection();
     const details = [];
     const lines = content.split(/\r?\n/);
-    if (lines.length > 10000)
-        throw new RangeError('A single import is limited to 10,000 cookies.');
-    const legacyCqmFlags = lines.some((candidate) => {
+    const formatMarker = '# Cookie Quick Manager Netscape v2';
+    const versionedCqmFlags = lines.some((candidate) => candidate.trim() === formatMarker);
+    const legacyCqmFlags = !versionedCqmFlags && lines.some((candidate) => {
         const fields = candidate.replace(/^#HttpOnly_/, '').split('\t');
         return fields.length === 7 && fields[0].startsWith('.') && !core.parseBoolean(fields[1]);
     });
+    let cookieRowCount = 0;
+    let expiredCount = 0;
     for (let index = 0; index < lines.length; index++) {
         let rawLine = lines[index];
         if (!rawLine.trim())
@@ -430,11 +434,16 @@ async function parseNETSCAPEFile(content) {
         const line = rawLine.split('\t');
         if (line.length !== 7)
             throw new Error(`Invalid Netscape cookie at line ${index + 1}.`);
+        cookieRowCount++;
+        if (cookieRowCount > 10000)
+            throw new RangeError('A single import is limited to 10,000 cookies.');
         const expirationDate = Number.parseInt(line[4], 10);
         if (!Number.isFinite(expirationDate))
             throw new Error(`Invalid expiration date at line ${index + 1}.`);
-        if (expirationDate !== 0 && expirationDate <= ((Date.now() / 1000 | 0) + 1))
+        if (expirationDate !== 0 && expirationDate <= ((Date.now() / 1000 | 0) + 1)) {
+            expiredCount++;
             continue;
+        }
 
         const cookie = {
             domain: line[0],
@@ -455,6 +464,7 @@ async function parseNETSCAPEFile(content) {
             cookie.firstPartyDomain = '';
         details.push(core.buildCookieSetDetails(cookie));
     }
+    details.expiredCount = expiredCount;
     return details;
 }
 
@@ -484,7 +494,7 @@ async function parseJSONFile(content) {
                 details.storeId = defaultStoreId;
             detailsList.push(details);
         } catch (error) {
-            if (error instanceof RangeError && /expiration must be in the future/.test(error.message)) {
+            if (error?.code === 'EXPIRED') {
                 expiredCount++;
                 continue;
             }
@@ -510,17 +520,29 @@ async function add_cookies(cookieDetails) {
         .filter((result) => result.status === 'fulfilled' && result.value)
         .map((result) => result.value);
     const failedCount = results.length - addedCookies.length;
-    if (items.import_protected_cookies && addedCookies.length)
-        await vAPI.set_cookie_protection(addedCookies, true);
+    if (items.import_protected_cookies && addedCookies.length) {
+        try {
+            await vAPI.set_cookie_protection(addedCookies, true);
+        } catch (error) {
+            // Import succeeded; a follow-up protection failure must not be
+            // presented as though the cookies themselves were not restored.
+            console.error('Failed to protect imported cookies:', error);
+        }
+    }
 
     const expiredCount = Number(cookieDetails.expiredCount) || 0;
+    const messages = [];
+    if (addedCookies.length)
+        messages.push(browser.i18n.getMessage('cookieRestoredSuccess', String(addedCookies.length)));
     if (failedCount)
-        set_info_text(browser.i18n.getMessage('cookieRestoredSingleError', `${failedCount} cookie(s) failed`));
-    else {
+        messages.push(browser.i18n.getMessage('cookieRestoredSingleError', String(failedCount)));
+    if (expiredCount)
+        messages.push(browser.i18n.getMessage('cookieRestoredExpiredSkipped', String(expiredCount)));
+    if (!messages.length) {
         const successMessage = browser.i18n.getMessage('cookieRestoredSuccess', String(addedCookies.length));
-        const expiredMessage = browser.i18n.getMessage('cookieRestoredExpiredSkipped', String(expiredCount));
-        set_info_text(expiredCount ? `${successMessage}<br>${expiredMessage}` : successMessage);
+        messages.push(successMessage);
     }
+    set_info_text(messages.join('<br>'));
     $('#actualize_button').click();
     $('#modal_info').modal('show');
     return {added: addedCookies.length, failed: failedCount, expired: expiredCount};

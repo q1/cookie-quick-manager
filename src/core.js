@@ -185,8 +185,13 @@
         const expirationDate = Number(cookie.expirationDate);
         const isSession = hasOwn(cookie, 'session') ? parseBoolean(cookie.session) : !Number.isFinite(expirationDate);
         if (!isSession) {
-            if (!Number.isFinite(expirationDate) || expirationDate <= now + 1)
-                throw new RangeError('Persistent cookie expiration must be in the future.');
+            if (!Number.isFinite(expirationDate))
+                throw new TypeError('Persistent cookie expiration must be a finite timestamp.');
+            if (expirationDate <= now + 1) {
+                const error = new RangeError('Persistent cookie expiration must be in the future.');
+                error.code = 'EXPIRED';
+                throw error;
+            }
             details.expirationDate = expirationDate;
         }
 
@@ -393,7 +398,7 @@
     }
 
     function filterCookies(cookies, query) {
-        const domain = String(query?.domain ?? '');
+        const domain = String(query?.domain ?? '').toLowerCase().replace(/^\.+|\.+$/g, '');
         const hostname = String(query?.hostname ?? '').toLowerCase().replace(/^\.+|\.+$/g, '');
         const names = Array.isArray(query?.names) ? query.names : [];
         const values = Array.isArray(query?.values) ? query.values : [];
@@ -405,7 +410,8 @@
                     !(hostname === cookieDomain || hostname.endsWith(`.${cookieDomain}`)))
                     return false;
             }
-            if (!hostname && domain && !String(cookie.domain).includes(domain))
+            if (!hostname && domain &&
+                !(cookieDomain === domain || cookieDomain.endsWith(`.${domain}`)))
                 return false;
             const nameMatches = !names.length || names.some((name) => String(cookie.name).includes(name));
             const valueMatches = !values.length || values.some((value) => String(cookie.value).includes(value));

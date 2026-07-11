@@ -64,11 +64,15 @@ async function waitForExtensionCookie(extensionPage, details, predicate, timeout
 }
 
 async function fixtureIsReady() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1000);
     try {
-        const response = await fetch(fixtureHealthUrl);
+        const response = await fetch(fixtureHealthUrl, {signal: controller.signal});
         return response.ok;
     } catch (error) {
         return false;
+    } finally {
+        clearTimeout(timeout);
     }
 }
 
@@ -776,11 +780,16 @@ async function run() {
             fields[3] = fields[3].toUpperCase();
             return `${httpOnly ? '#HttpOnly_' : ''}${fields.join('\t')}`;
         }).join('\n');
+        const expiredNetscapeLine = 'lvh.me\tfalse\t/\tfalse\t1\tfixture_netscape_expired\texpired';
         await submitImport(managerPage, {
             name: 'cookies.txt',
             mimeType: 'text/plain',
-            buffer: Buffer.from(`\uFEFF# Netscape HTTP Cookie File\n${uppercaseNetscape}`, 'utf8'),
+            buffer: Buffer.from(
+                `\uFEFF# Netscape HTTP Cookie File\n# Cookie Quick Manager Netscape v2\n${uppercaseNetscape}\n${expiredNetscapeLine}`,
+                'utf8',
+            ),
         });
+        const netscapeImportInfo = await managerPage.locator('#info_text').textContent();
         const restoredNetscapeHost = await waitForExtensionCookie(
             managerPage,
             {name: 'fixture_netscape_host'},
@@ -791,8 +800,12 @@ async function run() {
             {name: 'fixture_netscape_domain'},
             (cookie) => !cookie.hostOnly && cookie.domain === '.lvh.me',
         );
-        assert(restoredNetscapeHost && restoredNetscapeDomain,
-            `Canonical uppercase/BOM Netscape import failed: ${JSON.stringify({restoredNetscapeHost, restoredNetscapeDomain})}`);
+        assert(restoredNetscapeHost && restoredNetscapeDomain &&
+            (await getExtensionCookies(managerPage, {name: 'fixture_netscape_expired'})).length === 0 &&
+            /1\s+expired/i.test(netscapeImportInfo),
+        `Canonical versioned/BOM Netscape import failed: ${JSON.stringify({
+            restoredNetscapeHost, restoredNetscapeDomain, netscapeImportInfo,
+        })}`);
         await closeModalIfVisible(managerPage, '#modal_info');
         await managerPage.evaluate(async (cookies) => {
             await vAPI.delete_cookies(Promise.resolve(cookies));
@@ -803,7 +816,7 @@ async function run() {
         results.push({
             check: 'netscape-standard-roundtrip',
             status: 'passed',
-            details: 'host/domain, HttpOnly, Secure, uppercase flags, BOM, and default store',
+            details: 'host/domain, HttpOnly, Secure, uppercase flags, format marker, expired count, BOM, and default store',
         });
 
         const partitionedCookie = await managerPage.evaluate(async () => browser.cookies.set({
@@ -948,7 +961,7 @@ async function run() {
         const boundaryDomains = await managerPage.evaluate(() =>
             [...document.querySelectorAll('#domain-list li')].map((node) =>
                 node.childNodes[0]?.textContent?.trim() || node.textContent.trim()));
-        assert(boundaryDomains.includes('example.com') && boundaryDomains.includes('notexample.com'),
+        assert(boundaryDomains.includes('example.com') && !boundaryDomains.includes('notexample.com'),
             `Domain grouping merged substring-only hosts: ${JSON.stringify(boundaryDomains)}`);
         results.push({check: 'domain-boundary-grouping', status: 'passed', details: boundaryDomains});
         await managerPage.evaluate(async () => Promise.all([
@@ -1053,7 +1066,7 @@ async function run() {
             skin: 'javascript:alert(1)',
         }));
         await optionsPage.locator('#my-protected-cookies-toggle').click();
-        await optionsPage.locator('#protected-cookie-tree label').waitFor();
+        await optionsPage.locator('#protected-cookie-tree .protection-entry').waitFor();
         assert((await optionsPage.locator('#fixture-settings-injection').count()) === 0,
             'Protected-cookie settings were interpreted as privileged HTML.');
         assert((await optionsPage.locator('#protected-cookie-tree').textContent()).includes('<b id="fixture-settings-injection">'),
@@ -1124,11 +1137,17 @@ async function run() {
         }, null, 2));
         process.exitCode = 1;
     } finally {
-        if (context)
-            await context.close();
-        if (userDataDir)
-            fs.rmSync(userDataDir, {recursive: true, force: true});
-        await stopFixtureServer(fixtureProcess);
+        try {
+            if (context)
+                await context.close();
+        } finally {
+            try {
+                if (userDataDir)
+                    fs.rmSync(userDataDir, {recursive: true, force: true});
+            } finally {
+                await stopFixtureServer(fixtureProcess);
+            }
+        }
     }
 }
 

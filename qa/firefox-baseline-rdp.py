@@ -301,9 +301,14 @@ def main():
             frame["consoleActor"],
             "document.cookie='fixture_js_host=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'; document.cookie",
         )
-        time.sleep(2)
-        _, frame = get_selected_target(client)
-        after_delete = client.evaluate(frame["consoleActor"], "document.cookie")
+        deadline = time.time() + 5
+        after_delete = ""
+        while time.time() < deadline:
+            _, frame = get_selected_target(client)
+            after_delete = client.evaluate(frame["consoleActor"], "document.cookie")
+            if "fixture_js_host=" in after_delete:
+                break
+            time.sleep(0.1)
         results.append({
             "check": "protected-cookie-delete-from-page-js",
             "status": "passed",

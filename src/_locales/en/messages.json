@@ -427,10 +427,10 @@
   },
 
   "cookieRestoredSingleError": {
-    "message": "Error, at least one cookie was not restored:<br>$error$<br>Don't worry; most of the time these are session cookies that have expired.",
-    "description": "Alert when a file is imported with an error during the save process.",
+    "message": "$number$ cookie(s) could not be restored.",
+    "description": "Import result for cookies that the browser rejected.",
     "placeholders": {
-      "error" : {
+      "number" : {
         "content" : "$1"
       }
     }
@@ -617,6 +617,41 @@
   "oExportAll": {
     "message": "Export all cookies to a file",
     "description": "Keyboard shortcut description: ctrl+S"
+  },
+
+  "cPartitionKey": {
+    "message": "Partition key",
+    "description": "Partition key field in the cookie details panel."
+  },
+
+  "oFpiLabel": {
+    "message": "First-Party Isolation",
+    "description": "First-Party Isolation option label."
+  },
+
+  "oFpiAvailability": {
+    "message": "First-Party Isolation is available only when the Firefox privacy API exposes it.",
+    "description": "First-Party Isolation availability notice."
+  },
+
+  "oFpiDescription": {
+    "message": "The firstPartyIsolate preference associates third-party data with the domain in the address bar. This limits cross-site tracking but can break third-party sign-in.",
+    "description": "Explanation of First-Party Isolation."
+  },
+
+  "oFpiMoreInfo": {
+    "message": "More information at",
+    "description": "Text before the First-Party Isolation documentation link."
+  },
+
+  "oFpiMdnLink": {
+    "message": "Mozilla Developer Network",
+    "description": "First-Party Isolation documentation link text."
+  },
+
+  "oFpiFirefoxOnly": {
+    "message": "This control is Firefox-only and is hidden on Chromium.",
+    "description": "Browser support notice for First-Party Isolation."
   },
 
 

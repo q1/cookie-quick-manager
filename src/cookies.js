@@ -120,7 +120,8 @@ $("#save_button").click(function() {
         storeId: $('#store').val(),
     };
     const selectedCookie = $('#cookie-list').find('li.active').data('cookie');
-    if (selectedCookie?.partitionKey)
+    if (selectedCookie?.partitionKey && selectedCookie.domain === params.domain &&
+        selectedCookie.name === params.name)
         params.partitionKey = selectedCookie.partitionKey;
 
     // Handle optional sameSite flag if supported
@@ -227,6 +228,7 @@ $("#protect_button").click(function() {
     .then((updatedProtectedCookies) => {
         protected_cookies = updatedProtectedCookies;
         set_protect_lock_icon(protect);
+        last_selected_cookie_index = $('#cookie-list').find('li.active').index();
         // Simulate click on domain
         $('#domain-list').find('li.active').click();
     })
@@ -1516,7 +1518,8 @@ function set_protect_lock_icon(status) {
 
 function delete_current_cookie() {
     /* Remove a cookie displayed on details zone
-     * NOTE: Remove inexistant cookie: Removed: null
+     * NOTE: vAPI.remove_cookie resolves to null if the cookie still exists
+     * (removal failed), and to the original cookie otherwise.
      * NOTE: This function does not try to delete protected cookie
      */
 

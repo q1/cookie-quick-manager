@@ -161,10 +161,21 @@ test('site-specific filtering includes applicable parent-domain cookies only', (
         ['host', 'parent']);
 });
 
+test('domain filtering observes DNS label boundaries', () => {
+    const cookies = [
+        cookie({domain: 'example.com'}),
+        cookie({domain: 'sub.example.com', name: 'subdomain'}),
+        cookie({domain: 'notexample.com', name: 'substring'}),
+    ];
+    assert.deepEqual(core.filterCookies(cookies, {domain: 'example.com'}).map((item) => item.name),
+        ['session', 'subdomain']);
+});
+
 test('exact protection distinguishes path, store, host scope, and partition', () => {
     const rootCookie = cookie();
     const pathCookie = cookie({path: '/app'});
     const storeCookie = cookie({storeId: '1'});
+    const domainCookie = cookie({domain: '.example.com', hostOnly: false});
     const partitionedCookie = cookie({partitionKey: {topLevelSite: 'https://top.example'}});
     const storage = {
         [core.protectionStorageKey(rootCookie)]: {
@@ -176,6 +187,7 @@ test('exact protection distinguishes path, store, host scope, and partition', ()
     assert.equal(core.isCookieProtected(rootCookie, protectedCookies), true);
     assert.equal(core.isCookieProtected(pathCookie, protectedCookies), false);
     assert.equal(core.isCookieProtected(storeCookie, protectedCookies), false);
+    assert.equal(core.isCookieProtected(domainCookie, protectedCookies), false);
     assert.equal(core.isCookieProtected(partitionedCookie, protectedCookies), false);
 });
 
@@ -252,7 +264,7 @@ test('expired persistent JSON cookies are rejected instead of becoming session c
         'Send for raw': 'true',
         'HTTP only raw': 'false',
         'This domain only raw': 'true',
-    }), /expiration must be in the future/);
+    }), (error) => error.code === 'EXPIRED' && /expiration must be in the future/.test(error.message));
 });
 
 test('nameless cookies remain importable and protectable', () => {
