@@ -279,7 +279,7 @@ vAPI.copy_cookies_to_store = async function(promise, store_id) {
 
     const cookies = await Promise.resolve(promise);
     const setPromises = cookies
-        .filter((cookie) => cookie.session || cookie.expirationDate > ((Date.now() / 1000 | 0) + 1))
+        .filter((cookie) => cookie.session || cookie.expirationDate > (Math.floor(Date.now() / 1000) + 1))
         .map((cookie) => vAPI.set_cookie(core.buildCookieSetDetails({...cookie, storeId: store_id})));
     return vAPI.add_cookies(Promise.all(setPromises));
 }

@@ -440,7 +440,7 @@ async function parseNETSCAPEFile(content) {
         const expirationDate = Number.parseInt(line[4], 10);
         if (!Number.isFinite(expirationDate))
             throw new Error(`Invalid expiration date at line ${index + 1}.`);
-        if (expirationDate !== 0 && expirationDate <= ((Date.now() / 1000 | 0) + 1)) {
+        if (expirationDate !== 0 && expirationDate <= (Math.floor(Date.now() / 1000) + 1)) {
             expiredCount++;
             continue;
         }

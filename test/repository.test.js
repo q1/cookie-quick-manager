@@ -44,3 +44,11 @@ test('runtime source no longer depends on a generated browser polyfill', () => {
         assert.equal(content.includes('core.js'), true, `${file} does not load core.js`);
     }
 });
+
+test('runtime epoch comparisons do not truncate timestamps to signed 32-bit integers', () => {
+    for (const file of ['api.js', 'export.js']) {
+        const content = fs.readFileSync(path.join(root, 'src', file), 'utf8');
+        assert.doesNotMatch(content, /Date\.now\(\)\s*\/\s*1000\s*\|\s*0/,
+            `${file} contains a Year 2038-unsafe epoch conversion`);
+    }
+});
