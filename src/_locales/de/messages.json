@@ -380,6 +380,16 @@
     }
   },
 
+  "cookieRestoredExpiredSkipped": {
+    "message": "$number$ abgelaufene Cookie(s) übersprungen.",
+    "description": "Importergebnis für Cookies, deren Ablaufdatum bereits überschritten ist.",
+    "placeholders": {
+      "number": {
+        "content": "$1"
+      }
+    }
+  },
+
   "cookieRestoredError": {
     "message": "Fehler, kein Cookie wiederhergestellt.<br>$json_error$",
     "description": "Alert when a file is imported with an error from the json parser.",
@@ -439,7 +449,7 @@
   },
 
   "oPrevent_protected_cookies_deletion": {
-    "message": " Verhindern, dass Websites geschützte Cookies löschen, auch wenn diese abgelaufen sind",
+    "message": " Verhindern, dass Websites geschützte Cookies ausdrücklich löschen",
     "description": "Settings page: Checkbox"
   },
 
@@ -613,6 +623,31 @@
   "popupOptions": {
     "message": "Optionen",
     "description": "Popup menu: go to options page"
+  },
+
+  "contextMenu_domain_protect_session": {
+    "message": "Sitzungscookies schützen",
+    "description": "Option for the contextual menu that opens on a domain."
+  },
+
+  "contextMenu_domain_unprotect_session": {
+    "message": "Schutz für Sitzungscookies aufheben",
+    "description": "Option for the contextual menu that opens on a domain."
+  },
+
+  "menu_protect_session": {
+    "message": "Sitzungscookies schützen",
+    "description": "Dropdown menu option."
+  },
+
+  "menu_unprotect_session": {
+    "message": "Schutz für Sitzungscookies aufheben",
+    "description": "Dropdown menu option."
+  },
+
+  "tooltip_cSameSite": {
+    "message": "Teilweiser Schutz vor Cross-Site Request Forgery (CSRF) und Cross-Site Script Inclusion (XSSI).<br>Im strikten Modus wird das Cookie nur bei Anfragen gesendet, die von der Website stammen, von der das Cookie gesetzt wurde.",
+    "description": "Select menu to modify the sameSite cookie flag."
   }
 
 }

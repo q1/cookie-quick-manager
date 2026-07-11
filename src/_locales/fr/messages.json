@@ -405,6 +405,16 @@
     }
   },
 
+  "cookieRestoredExpiredSkipped": {
+    "message": "$number$ cookie(s) expiré(s) ignoré(s).",
+    "description": "Résultat d'importation pour les cookies dont la date d'expiration est déjà passée.",
+    "placeholders": {
+      "number": {
+        "content": "$1"
+      }
+    }
+  },
+
   "cookieRestoredError": {
     "message": "Erreur, aucun cookie n'a été restauré.<br>$json_error$",
     "description": "Alert when a file is imported with an error from the json parser.",
@@ -464,7 +474,7 @@
   },
 
   "oPrevent_protected_cookies_deletion": {
-    "message": " Empêcher les sites de supprimer des cookies protégés, même s'ils sont expirés",
+    "message": " Empêcher les sites de supprimer explicitement les cookies protégés",
     "description": "Settings page: Checkbox"
   },
 

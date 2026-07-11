@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
-    <script src="static/js/browser-polyfill.min.js"></script>
+    <script src="browser-shim.js"></script>
+    <script src="core.js"></script>
     <script src="platform.js"></script>
     <style>
     body {
@@ -34,12 +35,12 @@
   </head>
   <body>
     <div class="panel">
-      <a href="#" id="simple_cookie_manager"><img class="favicon" src="icons/icon48.png"><span data-i18n-content="popupSimple"><span></a>
-      <a href="#" id="search_cookie_manager"><span data-i18n-content="popupSearch"><span></a>
-      <a href="#" id="delete_current_cookies"><img class="favicon" src="icons/forbidden48.png"><span data-i18n-content="popupDeleteCurrentCookies"><span></a>
-      <a href="#" id="delete_context_cookies"><img class="favicon" src="icons/forbidden48.png"><span data-i18n-content="popupDeleteContextCookies"><span></a>
-      <a href="#" id="delete_current_localstorage"><span class="favicon"></span><span data-i18n-content="popupDeleteCurrentLocalStorage"><span></a>
-      <a href="#" id="options"><span class="favicon"></span><span data-i18n-content="popupOptions"><span></a>
+      <a href="#" id="simple_cookie_manager"><img class="favicon" src="icons/icon48.png"><span data-i18n-content="popupSimple"></span></a>
+      <a href="#" id="search_cookie_manager"><span data-i18n-content="popupSearch"></span></a>
+      <a href="#" id="delete_current_cookies"><img class="favicon" src="icons/forbidden48.png"><span data-i18n-content="popupDeleteCurrentCookies"></span></a>
+      <a href="#" id="delete_context_cookies"><img class="favicon" src="icons/forbidden48.png"><span data-i18n-content="popupDeleteContextCookies"></span></a>
+      <a href="#" id="delete_current_localstorage"><span class="favicon"></span><span data-i18n-content="popupDeleteCurrentLocalStorage"></span></a>
+      <a href="#" id="options"><span class="favicon"></span><span data-i18n-content="popupOptions"></span></a>
     </div>
     <script src="api.js"></script>
     <script src="menu.js"></script>

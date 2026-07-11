@@ -1,185 +1,111 @@
-# Chromium MV3 Parity Report
+# Cookie Quick Manager 0.6.0 QA and compatibility report
 
-Date: 2026-03-22
+Date: 2026-07-11
 
-This report summarizes the parity-focused QA work completed for the Chromium/Manifest V3 port against the original Firefox extension behavior.
+This report records evidence for the current dual-target recode. It deliberately separates current-artifact verification from the historical Firefox baseline; Firefox lint alone is not treated as runtime parity.
 
-## Test setup
+## Target artifacts
 
-### Fixture environment
+- Chromium Manifest V3, minimum Chrome 130
+- Firefox Manifest V3, minimum Firefox desktop 140
+- Firefox for Android, minimum Firefox 142
+- Package and both manifests: version 0.6.0
 
-Deterministic fixture pages were used instead of arbitrary live sites:
+The Chromium and Firefox ZIPs were rebuilt from clean target directories and verified byte-for-byte against every file in those directories.
 
-* HTTP: `http://lvh.me:4173/`
-* HTTPS: `https://lvh.me:4443/`
-* subdomain variants on `sub.lvh.me`
+## Automated release gate
 
-These fixtures support:
-
-* host-only and domain cookies
-* page-driven cookie deletion
-* LocalStorage seeding/clearing
-* secure-cookie testing on HTTPS
-
-### Baseline Firefox extension
-
-The original Firefox artifact from `dist/cookie_quick_manager-0.5rc2.zip` was extracted and launched with `web-ext` for comparison.
-
-### Chromium target
-
-The ported extension was loaded from `build/` as an unpacked Manifest V3 Chromium extension.
-
-## Chromium verification performed
-
-### Manual GUI smoke checks
-
-Confirmed manually in Chromium:
-
-* unpacked extension loads successfully in `chrome://extensions`
-* popup opens successfully
-* site-specific popup entries appear on the fixture page
-* popup counts looked plausible for:
-  * current-site cookies
-  * current-store cookies
-  * current-site LocalStorage
-* manager page opens and lists seeded fixture cookies
-
-### Automated Chromium QA
-
-Executed with:
+Command:
 
 ```bash
-npm run qa:chromium
+npm run check
 ```
 
-Passing checks:
+The gate is self-contained. Starting without `qa/certs/` or a fixture process, it generated a development certificate, started the fixture on loopback, ran the browsers, and stopped the process it owned.
 
-* fixture seeding
-* manager domain listing
-* auto-refresh when a same-domain cookie is created outside the manager
-* subdomain grouping
-* search filtering by cookie name
-* protected-cookie restoration after page-driven deletion
-* cookie editing
-* JSON export
-* direct JSON restore
-* delete cookie
-* JSON import round-trip
-* secure cookie creation on HTTPS
-* hidden Firefox-only FPI control on Chromium options page
-* representative options persistence
+Latest clean result:
 
-Latest successful result set:
+- 34/34 browser-independent unit, core, adapter, manifest, and locale contracts passed
+- source, QA, build-script, and Firefox RDP probe syntax checks passed
+- Chromium and Firefox builds passed
+- Firefox `web-ext lint`: 0 errors, 0 warnings, 2 known-library notices
+- 35/35 Chromium Playwright workflows passed
+- `npm audit`: 0 vulnerabilities
+- `git diff --check`: passed
 
-```json
-{
-  "ok": true,
-  "results": [
-    {"check": "fixture-seeding", "status": "passed"},
-    {"check": "manager-domain-list", "status": "passed"},
-    {"check": "auto-refresh", "status": "passed"},
-    {"check": "group-subdomains", "status": "passed"},
-    {"check": "search-filter-by-name", "status": "passed"},
-    {"check": "protected-cookie-restore", "status": "passed"},
-    {"check": "edit-cookie", "status": "passed"},
-    {"check": "export-cookie-json", "status": "passed"},
-    {"check": "direct-json-restore", "status": "passed"},
-    {"check": "delete-cookie", "status": "passed"},
-    {"check": "import-cookie-json", "status": "passed"},
-    {"check": "create-secure-cookie", "status": "passed"},
-    {"check": "options-hide-fpi", "status": "passed"},
-    {"check": "options-persistence", "status": "passed"}
-  ]
-}
-```
+The final 35-scenario Chromium suite also passed in a separate repeat execution.
 
-## Firefox baseline verification performed
+## Chromium runtime coverage
 
-The Firefox baseline was inspected through Firefox's remote debugging protocol against the temporary add-on session launched by `web-ext`.
+The suite loads the unpacked extension into headless Chromium and exercises production UI/adapters, not test-only reimplementations.
 
-Executed with:
+Passing scenarios:
 
-```bash
-python3 qa/firefox-baseline-rdp.py
-```
+1. Fixture cookie seeding
+2. Manager domain listing
+3. Auto-refresh on additions and website expiry tombstones
+4. Subdomain grouping
+5. Name filtering
+6. Protected host-cookie restoration after website deletion
+7. Cookie value editing
+8. Single-cookie JSON export and count rendering
+9. Exact unprotect/delete
+10. JSON import through the real file handler
+11. Domain-cookie editing
+12. Protected domain-cookie attribute restoration
+13. Fresh-value rotation winning over a stale pending restore
+14. Exact protected path identity
+15. Exact unprotected `/`, `/app`, and unusual-path deletion
+16. Host-only/domain sibling collision restore and deletion
+17. Delete-key safety inside editors
+18. Filtered bulk deletion leaving non-visible cookies untouched
+19. Domain JSON round-trip with quotes, backslashes, template tokens, and Unicode
+20. Full pre-mutation validation of invalid multi-record imports
+21. Aging backups: live nameless cookie restored, expired persistent record skipped
+22. Netscape host/domain, HttpOnly, Secure, uppercase flags, BOM, and default-store round-trip
+23. Partitioned cookie edit/export/import/delete
+24. Same-site partition identities with opposite ancestor bits shown distinctly
+25. Actual subdomain grouping
+26. Site-specific launch including applicable parent-domain cookies but not host-only parents
+27. Domain label-boundary handling
+28. Prototype-named intranet domain safety
+29. Actual popup cookie/LocalStorage counts and LocalStorage clearing
+30. Secure SameSite=None creation on HTTPS
+31. Chromium options hiding Firefox-only FPI controls
+32. Options persistence
+33. Privileged settings-tree markup rendered literally
+34. Settings restore replacing the snapshot and removing stale exact-protection keys
+35. Settings reset restoring complete defaults
 
-Passing checks:
+The runner also fails on uncaught page exceptions and extension-page/service-worker console errors.
 
-* fixture seeding
-* manager page opens
-* manager lists seeded `.lvh.me` and `lvh.me` domains
-* subdomain grouping collapses host/domain variants into one grouped domain
-* name-based search filtering isolates the expected cookie
-* host-only cookie can be selected from the manager
-* single-cookie protection state can be normalized to locked
-* protected host cookie survives page-driven deletion after the protection state is normalized
+## Firefox current-artifact evidence
 
-Latest successful result set:
+The current Firefox artifact:
 
-```json
-{
-  "ok": true,
-  "results": [
-    {"check": "fixture-seeding", "status": "passed"},
-    {"check": "manager-domain-list", "status": "passed"},
-    {"check": "group-subdomains", "status": "passed"},
-    {"check": "search-filter-by-name", "status": "passed"},
-    {"check": "select-host-cookie", "status": "passed"},
-    {"check": "protect-state-normalized", "status": "passed"},
-    {"check": "protected-cookie-delete-from-page-js", "status": "passed"}
-  ]
-}
-```
+- builds with the Firefox background-script manifest;
+- installs in Firefox 151 headless;
+- passed the seven strengthened runtime smoke assertions: fixture seeding, manager launch/listing, grouping, filtering, host-cookie selection, protection activation, and protected-cookie survival after page deletion;
+- preserved `partitionKey.topLevelSite` and `hasCrossSiteAncestor` in targeted Firefox 151 set/query probes;
+- handled exact nameless and host/domain tombstone deletion in targeted Firefox 151 probes.
 
-## Parity conclusions
+The committed RDP probe was hardened so fixture, selection, protection, and survival checks fail closed. Its asynchronous protection step now polls synchronously rather than mistaking an RDP Promise grip for a result.
 
-### Verified equivalent or acceptably equivalent behavior
+This is useful current-artifact smoke evidence, but it is not a full Firefox equivalent of the 35-scenario Chromium suite.
 
-* manager page opens successfully in both Firefox baseline and Chromium port
-* seeded host-only/domain cookies are visible in the manager
-* subdomain grouping matches between Firefox baseline and Chromium
-* name-based search filtering matches between Firefox baseline and Chromium
-* single-cookie protection works and prevents page-driven deletion
-* auto-refresh works in Chromium for same-domain external cookie mutations
-* cookie edit flow works in Chromium
-* JSON export/import round-trip works in Chromium
-* secure cookie creation works in Chromium on HTTPS fixtures
-* representative options persistence works in Chromium
+## Historical baseline
 
-### Intentional Chromium substitutions
+The original 0.5rc2 Firefox artifact remains useful for reconstructing intent. The old Chromium suite had 14 passing checks, and the historical Firefox probe had seven. Fan-out review showed that those checks contained shortcuts and false negatives: they did not expose service-worker cold-start cleanup, malformed domain URLs, incomplete cookie identity, partition blindness, unsafe repeated imports, or native `cookies.remove()` over-deletion.
 
-These are expected platform substitutions, not regressions:
+Those historical results are retained as behavioral context, not release signoff for 0.6.0.
 
-* **Firefox containers / contextual identities** → **Chromium cookie stores**
-* **Firefox FPI UI / setting** → hidden on Chromium
-* **Firefox panel window behavior** → tab by default, standard popup window when windowed mode is selected
+## Remaining matrix limitations
 
-### Remaining QA limitations
+- The full 35-scenario suite is Chromium-only; current Firefox automation is a seven-check smoke plus targeted API probes.
+- Firefox 140, Firefox Android 142, and real Android UI behavior were not run on this machine.
+- Chromium and Firefox private/incognito enablement and container/store isolation do not yet have a full automated browser-policy matrix.
+- The packaged privileged UI still contains legacy jQuery, Bootstrap 3, Moment, and context-menu libraries. Unused treeview/theme assets were removed, DOM sinks were hardened, and Firefox lint reports notices rather than errors, but dependency modernization remains worthwhile.
 
-The highest-value parity scenarios are covered, but not every historical UI path was fully automated on both browsers.
+## Conclusion
 
-Not exhaustively automated yet:
-
-* Firefox popup quick-action counts
-* full Firefox export/import round-trip through UI
-* Firefox options persistence matrix
-* incognito/store comparison matrix on both browsers
-
-These are follow-up QA opportunities rather than known failures.
-
-## Overall signoff
-
-The Chromium port now has strong evidence for core parity on the most critical user-facing workflows:
-
-* cookie discovery/listing
-* search filtering
-* subdomain grouping
-* auto-refresh
-* single-cookie editing
-* single-cookie protection and restore behavior
-* JSON import/export
-* secure cookie creation
-* representative options persistence
-* Chromium-specific platform substitutions documented clearly
-
-At this point, the Chromium MV3 port is in good shape for a parity-first release candidate, with deeper modernization intentionally deferred until after this parity pass.
+Version 0.6.0 has substantially stronger evidence than the previous parity candidate for its core intent: exact cookie management, safe protection, faithful import/export, site-specific search, settings integrity, and popup LocalStorage actions. Chromium is covered by a broad reproducible release gate. Firefox has a valid, lint-clean, runtime-smoked artifact, with deeper cross-browser and private-store automation still explicitly open.

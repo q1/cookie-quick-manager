@@ -29,6 +29,7 @@
 }(function($, vAPI, window, document) {
 
     // The $ is now locally scoped
+    const core = window.CQMCore;
     $(function () {
         /*********** Events attached to UI elements ***********/
         $('#import_protected_cookies').change(function() {
@@ -63,11 +64,16 @@
             // Change template
             set_option({'template': $(this).val()});
         });
-        $('#resetUserDataButton').click(function() {
+        $('#resetUserDataButton').click(async function() {
             // Reset all data
-            browser.storage.local.clear();
-            // Update the interface
-            get_options();
+            try {
+                await browser.storage.local.clear();
+                await browser.storage.local.set(core.getDefaultSettings());
+                await get_options();
+                build_treeview();
+            } catch (error) {
+                console.error(error);
+            }
         });
         $('#backupUserDataButton').click(function() {
             // Get all storage data
@@ -95,12 +101,16 @@
                 return;
 
             var reader = new FileReader();
-            reader.onload = function(event) {
-                // Restore content
-                //console.log(JSON.parse(event.target.result));
-                set_option(JSON.parse(event.target.result));
-                // Update the interface
-                get_options();
+            reader.onload = async function(event) {
+                try {
+                    const restoredSettings = core.sanitizeSettings(JSON.parse(event.target.result));
+                    await browser.storage.local.clear();
+                    await browser.storage.local.set({...core.getDefaultSettings(), ...restoredSettings});
+                    await get_options();
+                    build_treeview();
+                } catch (error) {
+                    window.alert(`Unable to restore settings: ${error.message}`);
+                }
             };
             reader.readAsText(file);
         });
@@ -111,48 +121,26 @@
             $('#fpi_info').toggle();
         });
 
-        $("#unprotectSelectedCookies").click(function(event) {
-            let protected_cookies = {};
-
-            // Get unchecked cookies in unchecked domains
-            for (let unchecked_item of $('#protected-cookie-tree').treeview('getUnchecked')) {
-
-                // Remove leafs
-                if (!unchecked_item.nodes)
-                    continue;
-
-                // If a domain is unchecked, it's because none of his children are checked
-                let unchecked_items = [];
-                for (let node of unchecked_item.nodes)
-                    unchecked_items.push(node.text);
-
-                protected_cookies[unchecked_item.text] = unchecked_items;
+        $("#unprotectSelectedCookies").click(async function(event) {
+            const cookies = [];
+            document.querySelectorAll('#protected-cookie-tree input.protection-entry:checked').forEach((checkbox) => {
+                const entry = protectionTreeEntries[Number(checkbox.dataset.entryIndex)];
+                cookies.push(typeof entry.record === 'string' ? {
+                    domain: entry.domain,
+                    name: entry.record,
+                    path: '/',
+                    storeId: '',
+                    hostOnly: !entry.domain.startsWith('.'),
+                } : {...entry.record, domain: entry.domain});
+            });
+            if (!cookies.length)
+                return;
+            try {
+                await vAPI.set_cookie_protection(cookies, false);
+                build_treeview();
+            } catch (error) {
+                console.error(error);
             }
-
-            // Get unchecked cookies in checked domains
-            for (let checked_item of $('#protected-cookie-tree').treeview('getChecked')) {
-
-                // Remove leafs
-                if (!checked_item.nodes)
-                    continue;
-
-                let unchecked_items = [];
-                for (let node of checked_item.nodes) {
-                    // If a domain is checked, maybe there is at least one child unchecked
-                    if (!node.state.checked)
-                        unchecked_items.push(node.text);
-                }
-
-                if (unchecked_items.length)
-                    protected_cookies[checked_item.text] = unchecked_items;
-            }
-
-            //console.log("protected", protected_cookies);
-
-            // Set new protected_cookies on storage area
-            browser.storage.local.set({"protected_cookies": protected_cookies});
-            // Update the treeview
-            build_treeview();
 
         });
 
@@ -165,15 +153,19 @@
         get_options();
         display_features_depending_on_browser_version();
         display_features_depending_on_OS();
+        const version = document.getElementById('current-version');
+        if (version)
+            version.textContent = browser.runtime.getManifest().version;
     });
 
     /*********** Utils ***********/
     function set_option(option_object) {
         //console.log({set_option: option_object});
         let set_settings = browser.storage.local.set(option_object);
-        set_settings.then(null, (error) => {
+        set_settings.catch((error) => {
             console.log(`set_option_error: ${error}`);
         });
+        return set_settings;
     }
 
     function get_options() {
@@ -187,7 +179,16 @@
             display_deletion_alert: true,
             template: 'JSON',
         });
-        get_settings.then((items) => {
+        return get_settings.then((items) => {
+            items = Object.assign({
+                delete_all_on_restart: false,
+                import_protected_cookies: false,
+                prevent_protected_cookies_deletion: true,
+                skin: 'default',
+                open_in_new_tab: true,
+                display_deletion_alert: true,
+                template: 'JSON',
+            }, core.sanitizeSettings(items));
             //console.log({storage_data: items});
 
             // Update the interface
@@ -244,103 +245,79 @@
 
 
     function build_treeview() {
-        // Build a treeview by getting protected cookies and initializing the treeview object.
+        // Build a native checkbox tree. Cookie names come from websites and must
+        // never be interpreted as HTML inside this privileged extension page.
 
-        let get_settings = browser.storage.local.get({
-            protected_cookies: {},
-        });
+        let get_settings = browser.storage.local.get(null);
         get_settings.then((items) => {
 
-            // Build tree object
-            var tree = [];
-            for (let domain in items.protected_cookies) {
-                let cookies_names = items.protected_cookies[domain];
+            const protectedCookies = core.protectedCookiesFromStorage(items);
+            const tree = document.getElementById('protected-cookie-tree');
+            tree.replaceChildren();
+            protectionTreeEntries = [];
 
-                // Build parent node
-                let node = {};
-                node.text = domain;
-                node.tags = [cookies_names.length];
-
-                // Build leafs with cookies names
-                let nodes = [];
-                cookies_names.forEach((cookie_name) => {
-                    nodes.push({text: cookie_name});
-                });
-
-                // Add nodes to parent
-                node['nodes'] = nodes;
-                // Add parent to tree
-                tree.push(node);
-            }
-            //console.log(tree);
-
-            if (!tree.length) {
-                $protected_cookie_tree.html('<i>' + browser.i18n.getMessage('oNoProtectedCookiesAlert') + '</i>');
+            if (!Object.keys(protectedCookies).length) {
+                const emptyMessage = document.createElement('i');
+                emptyMessage.textContent = browser.i18n.getMessage('oNoProtectedCookiesAlert');
+                tree.appendChild(emptyMessage);
                 $('#unprotectSelectedCookies').hide();
                 return;
             }
 
-            // Protected cookies to show
             $('#unprotectSelectedCookies').show();
-            // Init treeview
-            init_treeview(tree);
+            for (const [domain, records] of Object.entries(protectedCookies)) {
+                const fieldset = document.createElement('fieldset');
+                const legend = document.createElement('legend');
+                const selectDomain = document.createElement('input');
+                selectDomain.type = 'checkbox';
+                const domainText = document.createTextNode(` ${domain} (${records.length})`);
+                legend.append(selectDomain, domainText);
+                fieldset.appendChild(legend);
+
+                const entries = [];
+                for (const record of records) {
+                    const row = document.createElement('div');
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'protection-entry';
+                    checkbox.dataset.entryIndex = String(protectionTreeEntries.length);
+                    const label = document.createElement('label');
+                    if (typeof record === 'string') {
+                        label.textContent = record;
+                    } else {
+                        const scopes = [
+                            `hostOnly=${record.hostOnly}`,
+                            `storeId=${record.storeId || ''}`,
+                        ];
+                        if (record.firstPartyDomain)
+                            scopes.push(`firstPartyDomain=${record.firstPartyDomain}`);
+                        if (record.partitionKey?.topLevelSite)
+                            scopes.push(`partitionKey=${record.partitionKey.topLevelSite}${
+                                typeof record.partitionKey.hasCrossSiteAncestor === 'boolean' ?
+                                    `; hasCrossSiteAncestor=${record.partitionKey.hasCrossSiteAncestor}` : ''}`);
+                        label.textContent = `${record.name || 'name=""'} — ${record.path} [${scopes.join('; ')}]`;
+                    }
+                    label.prepend(checkbox, document.createTextNode(' '));
+                    row.appendChild(label);
+                    fieldset.appendChild(row);
+                    entries.push(checkbox);
+                    protectionTreeEntries.push({domain, record});
+                }
+                selectDomain.addEventListener('change', () => {
+                    entries.forEach((checkbox) => { checkbox.checked = selectDomain.checked; });
+                });
+                entries.forEach((checkbox) => checkbox.addEventListener('change', () => {
+                    selectDomain.checked = entries.every((entry) => entry.checked);
+                    selectDomain.indeterminate = !selectDomain.checked && entries.some((entry) => entry.checked);
+                }));
+                tree.appendChild(fieldset);
+            }
 
         })
         .catch(err => console.error(err));
     }
 
-    function init_treeview(tree) {
-
-        $protected_cookie_tree.treeview({
-            data: tree,
-            showIcon: false,
-            showCheckbox: true,
-            showTags: true,
-            showBorder: false,
-            onNodeChecked: function(event, node) {
-                //console.log(node.text + ' was checked');
-                if (!node.nodes) {
-                    // Leaf: check the parent node
-                    let parent_node = $protected_cookie_tree.treeview('getParent', node);
-                    $protected_cookie_tree.treeview('checkNode', [ parent_node.nodeId, { silent: true } ]);
-                    return;
-                }
-                // Parent node: check all leafs
-                for (let child_node of node.nodes) {
-                    //Triggers nodeChecked event; pass silent to suppress events.
-                    $protected_cookie_tree.treeview('checkNode', [ child_node.nodeId, { silent: true } ]);
-                }
-            },
-            onNodeUnchecked: function (event, node) {
-                //console.log(node.text + ' was unchecked');
-                if (!node.nodes) {
-                    // Leaf
-                    // Check if siblings are unchecked too
-                    // If there is no checked node, we uncheck the parent one.
-                    let sibling_nodes = $protected_cookie_tree.treeview('getSiblings', node);
-                    let checked_siblings_count = 0;
-                    for (let sibling_node of sibling_nodes) {
-                        if (sibling_node.state.checked)
-                            checked_siblings_count++;
-                    }
-
-                    if (!checked_siblings_count) {
-                        // No checked leafs
-                        let parent_node = $protected_cookie_tree.treeview('getParent', node);
-                        $protected_cookie_tree.treeview('uncheckNode', [ parent_node.nodeId, { silent: true } ]);
-                    }
-                    return;
-                }
-                // Parent node: uncheck all leafs
-                for (let child_node of node.nodes) {
-                    //Triggers nodeChecked event; pass silent to suppress events.
-                    $protected_cookie_tree.treeview('uncheckNode', [ child_node.nodeId, { silent: true } ]);
-                }
-            }
-        });
-    }
-
     /*********** Global variables ***********/
 
-    var $protected_cookie_tree = $('#protected-cookie-tree');
+    var protectionTreeEntries = [];
 }));

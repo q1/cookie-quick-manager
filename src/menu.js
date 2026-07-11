@@ -41,6 +41,8 @@
 
             if (id == "search_cookie_manager") {
                 element.onclick = function () {
+                    if (!current_tab)
+                        return;
                     // Search cookies for a domain: Send current url
                     let createData = {
                         url: "cookies.html?parent_url=" + encodeURIComponent(current_tab.url),
@@ -61,6 +63,8 @@
 
             else if (id == "delete_current_cookies") {
                 element.onclick = function () {
+                    if (!current_tab || current_store_id === undefined)
+                        return;
                     // Delete all cookies for the current domain & store
                     // Note: delete_cookies() closes the window
                     let params = {
@@ -73,6 +77,8 @@
 
             else if (id == "delete_context_cookies") {
                 element.onclick = function () {
+                    if (current_store_id === undefined)
+                        return;
                     // Delete all cookies for the current store
                     // Note: delete_cookies() closes the window
 
@@ -85,7 +91,7 @@
                         // when a user wants to delete all cookies from at least 1 context
                         if (items.display_deletion_alert) {
                             let deletion_confirmed = window.confirm(
-                                browser.i18n.getMessage("modalMenuAlertContent", cookies_context_number)
+                                browser.i18n.getMessage("modalMenuAlertContent", String(cookies_context_number))
                             );
                             if (!deletion_confirmed)
                                 // User didn't confirm deletion
@@ -103,17 +109,16 @@
 
             else if (id == "delete_current_localstorage") {
                 element.onclick = function () {
-                    // Purge LocalStore for the current domain
-                    // NOTE: subdomains will not be taken into account
-                    let prom = browser.browsingData.remove({
-                        origins: [(new URL(current_tab.url)).origin,]
-                    }, {
-                        localStorage: true,
-                    });
-                    prom.then((ret) => {
+                    if (!current_tab)
+                        return;
+                    // Clear only the active document's exact LocalStorage origin.
+                    browser.scripting.executeScript({
+                        target: {tabId: current_tab.id},
+                        func: () => window.localStorage.clear(),
+                    }).then(() => {
                         // Force the closing of the window
                         window.close();
-                    });
+                    }).catch(console.error);
                 }
             }
 
@@ -140,7 +145,7 @@
         if (vAPI.supportsFirstPartyIsolation)
                 params['firstPartyDomain'] = null;
 
-        vAPI.delete_cookies(browser.cookies.getAll(params))
+        vAPI.delete_cookies(vAPI.get_cookies(params))
         .then((ret) => {
             // Force the closing of the window
             window.close();
@@ -306,8 +311,8 @@
 
                 // Merge all promises
                 return Promise.all([
-                    browser.cookies.getAll(params_current_cookies),
-                    browser.cookies.getAll(params_context_cookies)]
+                    vAPI.get_cookies(params_current_cookies),
+                    vAPI.get_cookies(params_context_cookies)]
                 );
             })
             .then((cookies_array) => {

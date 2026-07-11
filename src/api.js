@@ -27,6 +27,10 @@ if ( self.vAPI === undefined ) {
 }
 
 var vAPI = self.vAPI;
+var core = self.CQMCore;
+
+if (!core)
+    throw new Error('CQMCore must be loaded before api.js');
 
 vAPI.onError = function(error) {
     // Function called when a save/remove function has failed by throwing an exception.
@@ -41,20 +45,6 @@ vAPI.onSet = function(result) {
     }
 }
 
-vAPI.getHostUrl = function(cookie) {
-    // If the modified cookie has the flag isSecure, the host protocol must be https:// in order to
-    // modify or delete it.
-    var host_protocol = (cookie.secure) ? 'https://' : 'http://';
-    return host_protocol + cookie.domain + cookie.path;
-}
-
-vAPI.getHostUrl_from_UI = function() {
-    // If the modified cookie has the flag isSecure, the host protocol must be https:// in order to
-    // modify or delete it.
-    var host_protocol = ($('#issecure').is(':checked')) ? 'https://' : 'http://';
-    return host_protocol + $('#domain').val() + $('#path').val();
-}
-
 vAPI.parse_search_query = function(search_query) {
     /* Parse search queries like:
      * 'domain1.com domain2.com :value:"value1" :name:"name1" :name:"name2" :value:"value2"'
@@ -66,52 +56,11 @@ vAPI.parse_search_query = function(search_query) {
      * PS: If multiple domains are present, for the moment we keep only the first one
      */
 
-    function extract_terms(patterns) {
-        // Return a list of clean terms entered by the user: ["name1",] or ["value1",]
-        // Argument patterns is a list of matches: [":name:\"name1\"",] or [":value:\"value1\"",]
-        if (!patterns)
-            return [];
-        let re = /"(.*)"/;
-        let terms = [];
-        for (let pattern of patterns)
-            terms.push(pattern.match(re)[1]);
-        // Remove empty strings from the list of terms
-        return terms.filter(n => n);
-    }
-
-    function get_domains(name_patterns, value_patterns) {
-        // Remove patterns from the query and return remaining domains
-        if (name_patterns)
-            for (let pattern of name_patterns)
-                search_query = search_query.replace(pattern, '');
-
-        if (value_patterns)
-            for (let pattern of value_patterns)
-                search_query = search_query.replace(pattern, '');
-
-        // Remove empty strings from the residual query
-        let domains = search_query.split(' ').filter(n => n);
-        return (!domains.length) ? [''] : domains;
-    }
-
-    let name_patterns = search_query.match(/:name:"([^"]|\\")*"/g);
-    //console.log("parse_search_query: name_patterns:", name_patterns);
-    let names = extract_terms(name_patterns);
-    //console.log("parse_search_query: names:", names);
-
-    let value_patterns = search_query.match(/:value:"([^"]|\\")*"/g);
-    //console.log("parse_search_query: value_patterns:", value_patterns);
-    let values = extract_terms(value_patterns);
-    //console.log("parse_search_query: values:", values);
-
-    // Remove patterns from the query and get simple domains
-    let domains = get_domains(name_patterns, value_patterns);
-    //console.log("parse_search_query: domain: ", domains[0]);
-
-    // Keep only the first domain for now
-    vAPI.query_domain = domains[0];
-    vAPI.query_names = names;
-    vAPI.query_values = values;
+    const query = core.parseSearchQuery(search_query);
+    vAPI.query_domain = query.domain;
+    vAPI.query_names = query.names;
+    vAPI.query_values = query.values;
+    return query;
 }
 
 vAPI.filter_cookies = function(promise) {
@@ -130,49 +79,15 @@ vAPI.filter_cookies = function(promise) {
      * Ex: ("name1" OR "name2") AND ("value1", "value2")
      */
 
-    // No filter => return the list of cookies unchanged
-    if (!vAPI.query_names.length && !vAPI.query_values.length)
-        return promise;
-
-    return new Promise((resolve, reject) => {
-        promise.then((cookies) => {
-
-            //console.log("filter_cookies: cookie to filter", cookies.length);
-
-            let filtered_cookies = [];
-            let name_found = false;
-            let value_found = false;
-            for (let cookie of cookies) {
-
-                for (let name of vAPI.query_names)
-                    if (cookie.name.indexOf(name) !== -1)
-                        // name is found => keep the cookie
-                        name_found = true;
-
-                for (let value of vAPI.query_values)
-                    if (cookie.value.indexOf(value) !== -1)
-                        // value is found => keep the cookie
-                        value_found = true;
-
-                if ((value_found && name_found) || (                 // value and name found in the same cookie
-                        (value_found && !vAPI.query_names.length) || // value found with no queried name
-                        (name_found && !vAPI.query_values.length)    // name found with no queried value
-                    )
-                ) {
-                    //console.log("filter_cookies: kept:", cookie.domain, cookie.name, cookie.value);
-                    filtered_cookies.push(cookie);
-                }
-
-                name_found = false;
-                value_found = false;
-            }
-            resolve(filtered_cookies);
-        })
-        .catch(err => console.error(err));
-    });
+    return Promise.resolve(promise).then((cookies) => core.filterCookies(cookies, {
+        domain: '',
+        hostname: vAPI.query_hostname || '',
+        names: vAPI.query_names || [],
+        values: vAPI.query_values || [],
+    }));
 }
 
-vAPI.get_all_cookies = function(storeIds) {
+vAPI.get_all_cookies = async function(storeIds) {
     // Return a Promise with all cookies in all stores
     // Handle multiple stores:
     // - by default ALL previously queried stores are used,
@@ -180,84 +95,81 @@ vAPI.get_all_cookies = function(storeIds) {
     // - otherwise uses storeIds argument.
     // Used by export.js on #clipboard_domain_export click event
 
-    return new Promise((resolve, reject) => {
-        if ((storeIds === undefined) || (storeIds[0] === 'all'))
-            storeIds = vAPI.storeIds;
+    if (!Array.isArray(storeIds) || storeIds[0] === 'all')
+        storeIds = vAPI.storeIds;
 
-        let promises = [];
-        for (let storeId of storeIds) {
-            let details = {storeId: storeId};
-            if (vAPI.supportsFirstPartyIsolation)
-                details.firstPartyDomain = null;
+    if (!Array.isArray(storeIds) || !storeIds.length)
+        return [];
 
-            promises.push(browser.cookies.getAll(details));
-        }
-        // Merge all promises
-        Promise.all(promises)
-        .then((cookies_array) => {
-            // Merge all results of promises
-            let cookies = Array.prototype.concat(...cookies_array);
-
-            if (cookies.length > 0) {
-
-                // Filtering cookies
-                // Filtering on domains
-                // PS: this step is made before the filtering of names and values
-                // because it is less complex and removes much more items
-                let filtered_cookies = [];
-                if (vAPI.query_domain == "") {
-                    // vAPI.query_domain is empty:
-                    // - get_all_cookies() is called from background script
-                    // in case of deletion on boot
-                    // - there is no searched domain
-                    filtered_cookies = cookies;
-                } else {
-                    for (let cookie of cookies) {
-                        // Do not display domains different than the searched one
-                        if (cookie.domain.indexOf(vAPI.query_domain) === -1)
-                            continue;
-
-                        filtered_cookies.push(cookie);
-                    }
-                }
-                //console.log("get_all_cookies: nb:", filtered_cookies.length);
-                resolve(filtered_cookies);
-            } else
-                reject("all_cookies-NoCookies");
-        })
-        .catch(err => console.error(err));
+    const cookieArrays = await Promise.all(storeIds.map((storeId) => {
+        const details = {storeId};
+        if (vAPI.supportsFirstPartyIsolation)
+            details.firstPartyDomain = null;
+        return vAPI.get_cookies(details);
+    }));
+    const cookies = cookieArrays.flat();
+    return core.filterCookies(cookies, {
+        domain: vAPI.query_domain || '',
+        hostname: vAPI.query_hostname || '',
+        names: [],
+        values: [],
     });
 }
 
-vAPI.get_stores = function() {
+vAPI.set_cookie = async function(details) {
+    const effectiveDetails = {...details};
+    if (!effectiveDetails.storeId)
+        effectiveDetails.storeId = vAPI.currentContextStoreId();
+    const setResult = await browser.cookies.set(effectiveDetails);
+
+    // Chromium can return an applicable parent-domain sibling instead of the
+    // exact host-only cookie just written. Resolve the requested scope before
+    // callers protect or otherwise act on the returned identity.
+    const canonicalDetails = {...effectiveDetails};
+    if (setResult?.storeId)
+        canonicalDetails.storeId = setResult.storeId;
+    if (setResult?.partitionKey)
+        canonicalDetails.partitionKey = setResult.partitionKey;
+    if (typeof setResult?.firstPartyDomain === 'string')
+        canonicalDetails.firstPartyDomain = setResult.firstPartyDomain;
+    const expected = core.cookieScopeFromSetDetails(canonicalDetails);
+    const candidates = await vAPI.get_cookies(core.buildCookieQueryDetails(expected));
+    const identity = core.cookieIdentity(expected);
+    return candidates.find((candidate) => core.cookieIdentity(candidate) === identity) || null;
+}
+
+vAPI.remove_cookie = async function(cookie) {
+    const identity = core.cookieIdentity(cookie);
+    // cookies.remove() cannot express hostOnly/domain identity and may remove
+    // multiple applicable siblings. An expired set operation carries the full
+    // cookie key, so it removes only the selected scope.
+    await browser.cookies.set(core.buildCookieDeletionDetails(cookie));
+    const candidates = await vAPI.get_cookies(core.buildCookieQueryDetails(cookie));
+    return candidates.some((candidate) => core.cookieIdentity(candidate) === identity) ? null : cookie;
+}
+
+vAPI.get_cookies = async function(details = {}) {
+    const queries = [browser.cookies.getAll(details)];
+    if (vAPI.supportsPartitionedCookies && details.partitionKey === undefined)
+        queries.push(browser.cookies.getAll({...details, partitionKey: {}}));
+
+    const cookies = (await Promise.all(queries)).flat();
+    const uniqueCookies = new Map();
+    for (const cookie of cookies)
+        uniqueCookies.set(core.cookieIdentity(cookie), cookie);
+    return [...uniqueCookies.values()];
+}
+
+vAPI.get_stores = async function() {
     // Set stores & vAPI.storeIds
     // Return a promise with stores
     // TODO make a function to acess to vAPI.storeIds as private attribute
 
-    return new Promise((resolve, reject) => {
-        let allowed_incognito_access = false;
-
-        browser.extension.isAllowedIncognitoAccess().then((allowed) => {
-            allowed_incognito_access = allowed;
-            //console.log("get_stores:: allowed incognito access?", allowed_incognito_access);
-            //console.log({default_stores: vAPI.default_stores});
-
-            if (!allowed_incognito_access) {
-                // The extension is not allowed to access private windows
-                // Keep only default context
-                vAPI.storesAllowed = [vAPI.default_stores[0]];
-            } else {
-                // Keep all default contexts
-                vAPI.storesAllowed = vAPI.default_stores;
-            }
-
-            if (!vAPI.supportsContextualIdentities)
-                return browser.cookies.getAllCookieStores();
-
-            // Query other contexts
-            return browser.contextualIdentities.query({});
-        })
-        .then((contexts_or_cookie_stores) => {
+    const allowed_incognito_access = await browser.extension.isAllowedIncognitoAccess();
+    vAPI.storesAllowed = allowed_incognito_access ? vAPI.default_stores : [vAPI.default_stores[0]];
+    const contexts_or_cookie_stores = vAPI.supportsContextualIdentities ?
+        await browser.contextualIdentities.query({}) :
+        await browser.cookies.getAllCookieStores();
             // contexts === false on Firefox < 57
             // on FF57- contexts doesn't contain default stores: firefox-private or firefox-default
             //console.log({CONTEXTS: contexts});
@@ -313,15 +225,10 @@ vAPI.get_stores = function() {
             });
             //console.log({Stores: stores});
 
-            resolve(stores);
-
-        }, (error) => {
-            console.error(error);
-        });
-    });
+    return stores;
 }
 
-vAPI.FPI_detection = function(promise) {
+vAPI.FPI_detection = async function(promise) {
     // Set the attribute vAPI.FPI with the status of First Party Isolation
     // This promise is made to be chained before all promises that call
     // browser.cookies.* on browser that can support or not this new API.
@@ -330,34 +237,19 @@ vAPI.FPI_detection = function(promise) {
 
     if (!vAPI.supportsFirstPartyIsolation) {
         vAPI.FPI = undefined;
-        return Promise.resolve(promise);
+        return promise;
     }
 
-    return new Promise((resolves, rejects) => {
-        // This promise will crash on FF 59-
-        // The error is captured by the error callback.
-        //console.log('Test availability of firstPartyIsolate API');
-        resolves(browser.privacy.websites.firstPartyIsolate.get({}));
-
-    })
-    .then((got) => {
-        // First Party Isolation is supported (FF 58+=)
-        //console.log('firstPartyIsolate API IS available');
-        // set FPI status to true or false
+    try {
+        const got = await browser.privacy.websites.firstPartyIsolate.get({});
         vAPI.FPI = got.value;
-        //console.log({FPI_status: vAPI.FPI});
-        return promise;
-
-    }, (error) => {
-        //console.log('firstPartyIsolate API is NOT available');
-        // set FPI status
+    } catch (error) {
         vAPI.FPI = undefined;
-        //console.log({FPI_status: vAPI.FPI});
-        return promise;
-    });
+    }
+    return promise;
 }
 
-vAPI.delete_cookies = function(promise) {
+vAPI.delete_cookies = async function(promise) {
     // Delete all cookies in the promise
     // Return a promise
     // PS: there is no verification of the support of FPI here
@@ -368,165 +260,45 @@ vAPI.delete_cookies = function(promise) {
     // they are protected against deletion)
     // NOTE: This function does not try to delete protected cookie
 
-    return new Promise((resolve, reject) => {
-
-        // DO NOT delete protected cookies
-        var protected_cookies;
-        var number_of_given_cookies;
-
-        browser.storage.local.get({
-            protected_cookies: {},
-        })
-        .then((items) => {
-
-            protected_cookies = items.protected_cookies;
-            return promise;
-        })
-        .then((cookies) => {
-            let promises = [];
-            number_of_given_cookies = cookies.length;
-
-            for (let cookie of cookies) {
-                // DO NOT delete protected cookies
-                if (cookie.domain in protected_cookies
-                    && protected_cookies[cookie.domain].indexOf(cookie.name) !== -1)
-                    continue;
-
-                // Remove current cookie
-                let params = {
-                    url: vAPI.getHostUrl(cookie),
-                    name: cookie.name,
-                    storeId: cookie.storeId,
-                };
-
-                // Handle FPI property
-                if (cookie.firstPartyDomain !== undefined)
-                    params.firstPartyDomain = cookie.firstPartyDomain;
-
-                //console.log({value: cookie.value, firstPartyDomain: cookie.firstPartyDomain});
-                promises.push(browser.cookies.remove(params));
-            }
-            // Merge all promises
-            return Promise.all(promises);
-        })
-        .then((cookies_array) => {
-            // Iter on all results of promises
-            for (let deleted_cookie of cookies_array) {
-
-                // If null: no error but no suppression
-                // => display button content in red
-                if (deleted_cookie === null) {
-                    console.log({"Not removed": deleted_cookie});
-                    // => display button content in red
-                    reject("No error but not removed");
-                }
-               // console.log({"Removed": deleted_cookie});
-            }
-            // Ok => all cookies are deleted properly
-            // Reactivate the interface
-            // Return the number of remaining cookies
-            resolve(number_of_given_cookies - cookies_array.length);
-        }, vAPI.onError);
-    });
+    const [items, cookies] = await Promise.all([
+        browser.storage.local.get(null),
+        Promise.resolve(promise),
+    ]);
+    const protectedCookies = core.protectedCookiesFromStorage(items);
+    const deletableCookies = cookies.filter((cookie) => !core.isCookieProtected(cookie, protectedCookies));
+    const results = await Promise.allSettled(deletableCookies.map((cookie) => vAPI.remove_cookie(cookie)));
+    const failures = results.filter((result) => result.status === 'rejected' || result.value === null);
+    if (failures.length)
+        throw new Error(`${failures.length} cookie(s) could not be removed.`);
+    return cookies.length - deletableCookies.length;
 }
 
-vAPI.copy_cookies_to_store = function(promise, store_id) {
+vAPI.copy_cookies_to_store = async function(promise, store_id) {
     // Copy a set of cookies to the store with the given store_id
     // Return a promise
 
-    return new Promise((resolve, reject) => {
-        promise.then((cookies) => {
-
-            let promises = [];
-            for (let cookie of cookies) {
-                // Build cookie
-                let params = {
-                    url: vAPI.getHostUrl(cookie),
-                    name: cookie.name,
-                    value: cookie.value,
-                    path: cookie.path,
-                    httpOnly: cookie.httpOnly,
-                    secure: cookie.secure,
-                    storeId: store_id,
-                };
-
-                // Handle optional sameSite flag if supported
-                if (cookie.sameSite != null)
-                    params['sameSite'] = cookie.sameSite;
-
-                // Session cookie has no expiration date
-                if (!cookie.session) {
-                    // Refuse expired cookies
-                    if (cookie.expirationDate <= ((Date.now() / 1000|0) + 1))
-                        continue;
-                    params['expirationDate'] = cookie.expirationDate;
-                }
-
-                // Handle FPI property
-                if (cookie.firstPartyDomain !== undefined)
-                    params.firstPartyDomain = cookie.firstPartyDomain;
-
-                promises.push(browser.cookies.set(params));
-            }
-            // Merge all promises
-            return vAPI.add_cookies(Promise.all(promises));
-        })
-        .then((ret) => {
-            // PS: when add_cookies raises an error, it handles itself this error,
-            // so we can end up here right after.
-            console.log("copy_cookies_to_store has ended");
-            resolve();
-        }, vAPI.onError);
-    });
+    const cookies = await Promise.resolve(promise);
+    const setPromises = cookies
+        .filter((cookie) => cookie.session || cookie.expirationDate > ((Date.now() / 1000 | 0) + 1))
+        .map((cookie) => vAPI.set_cookie(core.buildCookieSetDetails({...cookie, storeId: store_id})));
+    return vAPI.add_cookies(Promise.all(setPromises));
 }
 
-vAPI.add_cookies = function(new_cookies_promises, protection_status) {
+vAPI.add_cookies = async function(new_cookies_promises, protection_status) {
     // Add given cookies to the cookie store
     // Used in export.js and api.js
     // Take a promise on new_cookies_promises
     // Return a promise
 
-    if (protection_status === undefined)
-        protection_status = false;
-
-    return new Promise((resolve, reject) => {
-
-        new_cookies_promises.then((cookies_array) => {
-            // Iter on all results of promises
-            for (let added_cookie of cookies_array) {
-
-                // If null: no error but no save
-                if (added_cookie === null) {
-                    console.log({"Not added": added_cookie});
-                    reject("Cookie " + JSON.stringify(added_cookie) + " can't be saved");
-                }
-                //console.log({"Added": added_cookie});
-            }
-
-            // Protect all cookies if asked in global settings
-            if (protection_status)
-                return vAPI.set_cookie_protection(cookies_array, true);
-
-        }, (error) => {
-            // Handle errors from browser.cookies.set promises
-            // Ex: errors due to access to the private cookies storeId
-            vAPI.onError(error);
-            reject(JSON.stringify(error.message));
-
-        }).then(() => {
-            // Ok => all cookies are added/protected properly
-            // Reactivate the interface
-            resolve();
-        }, (error) => {
-            // Errors while adding the cookies,
-            // or while the protection of cookies.
-            // TODO: make a proper message
-            reject(JSON.stringify(error));
-        });
-    });
+    const cookies = await Promise.resolve(new_cookies_promises);
+    if (cookies.some((cookie) => cookie === null))
+        throw new Error('At least one cookie could not be saved.');
+    if (protection_status)
+        await vAPI.set_cookie_protection(cookies, true);
+    return cookies;
 }
 
-vAPI.getCookiesFromSelectedDomain = function() {
+vAPI.getCookiesFromSelectedDomain = async function() {
     // Return a Promise with cookies that belong to the selected domain;
     // Return also cookies for subdomains if the subdomain checkbox is checked.
     // https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Objets_globaux/Promise
@@ -535,132 +307,115 @@ vAPI.getCookiesFromSelectedDomain = function() {
     // => la fonction doit prendre directement la liste des domaines, les stores, l'état de query-subdomains
     // Used by export.js on #clipboard_domain_export click event
 
-    return new Promise((resolve, reject) => {
+    const domainObject = document.querySelector('#domain-list li.active');
+    if (!domainObject)
+        throw new Error('SelectedDomain-NoDomain');
+    const domainQuery = $(domainObject).data('domainQuery');
+    if (!domainQuery)
+        throw new Error('SelectedDomain-NoQuery');
+    var domain = domainQuery.id;
+    var storeIds = domainQuery.storeIds;
+    // TODO: simulate multiple domains
+    var domains = [domain, ];
+    let promises = [];
+    for (let domain of domains) {
+        for (let storeId of storeIds) {
+            let details = {domain: domain, storeId: storeId};
+            if (vAPI.supportsFirstPartyIsolation)
+                details.firstPartyDomain = null;
 
-        // Workaround to get click event data of the selected domain
-        // Get pure HTML document (not a JQuery one)
-        var domain_obj = document.querySelector('#domain-list li.active');
-        if (!domain_obj) {
-            reject("SelectedDomain-NoDomain");
-            return;
+            promises.push(vAPI.get_cookies(details));
         }
-        //console.log($._data(domain, "events" ));
-        // Get data of the first click event registered
-        var click_event_data = $._data(domain_obj, "events" ).click[0].data
-        var domain = click_event_data.id;
-        var storeIds = click_event_data.storeIds;
-        // TODO: simulate multiple domains
-        var domains = [domain, ];
-        let promises = [];
-        for (let domain of domains) {
-            for (let storeId of storeIds) {
-                let details = {domain: domain, storeId: storeId};
-                if (vAPI.supportsFirstPartyIsolation)
-                    details.firstPartyDomain = null;
+    }
+    const cookies_array = await Promise.all(promises);
+    // Merge all results of promises
+    let cookies = Array.prototype.concat(...cookies_array);
 
-                promises.push(browser.cookies.getAll(details));
+    if (cookies.length > 0) {
+        let filtered_cookies = [];
+        let query_subdomains = $('#query-subdomains').is(':checked');
+        if (query_subdomains) {
+            filtered_cookies = cookies;
+        } else {
+            // Sub domains are not wanted here
+            for (let cookie of cookies) {
+                if (domains.indexOf(cookie.domain) !== -1)
+                    filtered_cookies.push(cookie);
             }
         }
-        Promise.all(promises)
-        .then((cookies_array) => {
-            // Merge all results of promises
-            let cookies = Array.prototype.concat(...cookies_array);
-
-            if (cookies.length > 0) {
-
-                // Filtering cookies
-                // Filtering on domains
-                // PS: this step is made before the filtering of names and values
-                // because it is less complex and removes much more items
-                let filtered_cookies = [];
-                let query_subdomains = $('#query-subdomains').is(':checked');
-                if (query_subdomains) {
-                    filtered_cookies = cookies;
-                } else {
-                    // Sub domains are not wanted here
-                    for (let cookie of cookies) {
-                        // Filter on exact domain (remove sub domains from the list)
-                        // If current domain is not found in domains => go to next cookie
-                        if (domains.indexOf(cookie.domain) !== -1)
-                            filtered_cookies.push(cookie);
-                    }
-                }
-                //console.log("getCookiesFromSelectedDomain: nb", filtered_cookies.length);
-                resolve(filtered_cookies);
-            } else {
-                reject("SelectedDomain-NoCookies");
-            }
-        });
-    });
+        return filtered_cookies;
+    } else {
+        throw new Error('SelectedDomain-NoCookies');
+    }
 }
 
-vAPI.set_cookie_protection = function(cookies, protect_flag) {
+vAPI.commit_cookie_protection = function(cookies, protect_flag) {
     // Iterate on all new cookies and add their domains and names to the
     // array of protected_cookies in local storage.
     // protect_flag: false: unprotect the cookies; true: protect the cookies
     // TODO: make a global promise shared with cookies.js (#protect_button.click) to check
     // the presence of a domain in protected_cookies
 
-    return new Promise((resolve, reject) => {
-
-        browser.storage.local.get({
-            protected_cookies: {},
-        })
-        .then((items) => {
-            for (let cookie of cookies) {
-                //console.log(cookie);
-
-                // Check domain
-                let domain = cookie.domain;
-                if (!(domain in items.protected_cookies)) {
-                    if (protect_flag)
-                        // Absent: we want to protect it: init domain
-                        items.protected_cookies[domain] = [];
-                    else
-                        // Absent we want to unprotect: do nothing
-                        continue;
-                }
-
-                // Check name
-                let name = cookie.name;
-                if (protect_flag && items.protected_cookies[domain].indexOf(name) === -1) {
-                    // This cookie will be protected
-                    console.log({'protect: add': name});
-                    items.protected_cookies[domain].push(name);
+    const operation = vAPI.protectionUpdateQueue.then(async () => {
+        const items = await browser.storage.local.get(null);
+        if (protect_flag) {
+            const additions = {};
+            for (const cookie of cookies) {
+                const record = core.makeProtectionRecord(cookie);
+                additions[core.protectionStorageKey(cookie)] = {domain: cookie.domain, record};
+            }
+            if (Object.keys(additions).length)
+                await browser.storage.local.set(additions);
+        } else {
+            const keys = new Set(cookies.map((cookie) => core.protectionStorageKey(cookie)));
+            for (const [key, value] of Object.entries(items)) {
+                if (!core.isProtectionStorageKey(key) || !value || typeof value !== 'object')
                     continue;
-                }
-
-                if ((!protect_flag) && (items.protected_cookies[domain].indexOf(name) !== -1)) {
-                    // This cookie will not be protected anymore
-                    console.log({'protect: rm': name});
-                    // Remove the current cookie name from list if it is already present
-                    items.protected_cookies[domain] = items.protected_cookies[domain].filter(present_name => {
-                        // To delete the cookie name, we have to return false if name == present_name
-                        // So, return true if name != present_name
-                        return name != present_name;
-                    });
+                for (const cookie of cookies) {
+                    if (value.domain === cookie.domain &&
+                        core.protectionRecordMatches(value.record, cookie))
+                        keys.add(key);
                 }
             }
+            if (keys.size)
+                await browser.storage.local.remove([...keys]);
 
-            // Clean empty domains => better privacy
-            let cleaned_protected_cookies = {};
-            for (let i in items.protected_cookies) {
-                if (items.protected_cookies[i].length != 0) {
-                    cleaned_protected_cookies[i] = items.protected_cookies[i];
-                }
-            }
-
-            // Set new protected_cookies on storage area
-            return browser.storage.local.set({"protected_cookies": cleaned_protected_cookies});
-        })
-        .then(() => {
-            resolve();
-
-        }, (error) => {
-            console.log({"Error during protection:": error, "Protection flag:": protect_flag});
-            reject({"Error during protection:": error, "Protection flag:": protect_flag});
-        });
+            // Legacy domain -> [name] rules are retained for compatibility and
+            // removed only when the user explicitly unprotects a matching cookie.
+            const legacy = core.normalizeProtectedCookies(items.protected_cookies);
+            const updatedLegacy = core.updateProtectionMap(legacy, cookies, false);
+            if (JSON.stringify(updatedLegacy) !== JSON.stringify(legacy))
+                await browser.storage.local.set({protected_cookies: updatedLegacy});
+        }
+        return vAPI.get_protected_cookies();
     });
+    vAPI.protectionUpdateQueue = operation.catch(() => {});
+    return operation;
+}
+
+vAPI.set_cookie_protection = async function(cookies, protect_flag) {
+    const safeCookies = cookies.map((cookie) => ({
+        domain: String(cookie.domain ?? ''),
+        name: String(cookie.name ?? ''),
+        path: core.normalizePath(cookie.path),
+        storeId: String(cookie.storeId ?? ''),
+        hostOnly: core.parseBoolean(cookie.hostOnly, !String(cookie.domain ?? '').startsWith('.')),
+        ...(typeof cookie.firstPartyDomain === 'string' ? {firstPartyDomain: cookie.firstPartyDomain} : {}),
+        ...(core.clonePartitionKey(cookie.partitionKey) ? {partitionKey: core.clonePartitionKey(cookie.partitionKey)} : {}),
+    }));
+    const response = await browser.runtime.sendMessage({
+        type: 'cqm:update-protection',
+        cookies: safeCookies,
+        protect: protect_flag === true,
+    });
+    if (!response?.ok)
+        throw new Error(response?.error || 'Protection update failed.');
+    return core.normalizeProtectedCookies(response.protectedCookies);
+}
+
+vAPI.get_protected_cookies = async function(storage_items) {
+    const items = storage_items || await browser.storage.local.get(null);
+    return core.protectedCookiesFromStorage(items);
 }
 
 vAPI.setFirstPartyIsolateStatus = function(status) {
@@ -695,16 +450,14 @@ vAPI.get_and_patch_protected_cookies = function(storage_items) {
     // Return the associative array of protected_cookies.
     // Return an empty associative array if something happened
 
-    // The array check is a workaround to fix previous bug e4e735f (an array instead of an object)
-    if (!Array.isArray(storage_items.protected_cookies))
-        return storage_items.protected_cookies;
-    else {
-        // protected_cookies is an Array
-        // Init data structure
-        let set_settings = browser.storage.local.set({"protected_cookies": {}});
-        set_settings.then(null, onError);
-        return {};
-    }
+    const protectedCookies = core.normalizeProtectedCookies(storage_items.protected_cookies);
+    if (JSON.stringify(protectedCookies) !== JSON.stringify(storage_items.protected_cookies))
+        browser.storage.local.set({protected_cookies: protectedCookies}).catch(vAPI.onError);
+    return protectedCookies;
+}
+
+vAPI.is_cookie_protected = function(cookie, protected_cookies) {
+    return core.isCookieProtected(cookie, protected_cookies);
 }
 
 vAPI.get_session_cookies = function(cookies) {
@@ -722,7 +475,7 @@ vAPI.get_session_cookies = function(cookies) {
 vAPI.ask_permission = function(permission_name) {
     // Ask the given permission to the browser
     // PS: Due to restrictions, this function must be called from a user input handler
-    browser.permissions.request({permissions: [permission_name]})
+    return browser.permissions.request({permissions: [permission_name]})
     .then((response) => {
         console.log("ask_permission:", permission_name, response);
     })
@@ -731,7 +484,7 @@ vAPI.ask_permission = function(permission_name) {
 
 vAPI.remove_permission = function(permission_name) {
     // Remove a permission
-    browser.permissions.remove({permissions: [permission_name]})
+    return browser.permissions.remove({permissions: [permission_name]})
     .catch(err => console.error(err));
 }
 
@@ -741,6 +494,7 @@ vAPI.remove_permission = function(permission_name) {
 // This attribute is "public" and should be used instead of vAPI.default_stores
 vAPI.storesAllowed = [];
 vAPI.storeIds = []; //Ex: ['firefox-default', 'firefox-private', ...];
+vAPI.protectionUpdateQueue = Promise.resolve();
 
 vAPI.template_JSON = {
     name: 'JSON',
@@ -787,7 +541,7 @@ vAPI.optimal_window_width = 1095;
 vAPI.optimal_window_height = 640;
 
 vAPI.query_domain = "";
-vAPI.query_names;
-vAPI.query_values;
+vAPI.query_names = [];
+vAPI.query_values = [];
 
 })(globalThis);

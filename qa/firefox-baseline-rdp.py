@@ -144,6 +144,8 @@ def main():
             "status": "passed",
             "details": seed_result,
         })
+        if not ("fixture_js_host=baseline-host" in seed_result and "fixture_js_domain=baseline-domain" in seed_result):
+            raise RuntimeError(f"Firefox fixture cookies were not seeded: {seed_result}")
 
         client.navigate(frame["actor"], manager_url)
 
@@ -156,11 +158,18 @@ def main():
                 cookies: [...document.querySelectorAll('#cookie-list li')].map(li => li.textContent.trim())
             })""",
         )
+        manager_state_data = json.loads(manager_state)
         results.append({
             "check": "manager-domain-list",
             "status": "passed",
-            "details": json.loads(manager_state),
+            "details": manager_state_data,
         })
+        if not (
+            manager_state_data["title"] == "Cookie Quick Manager"
+            and any("lvh.me" in domain for domain in manager_state_data["domains"])
+            and manager_state_data["cookies"]
+        ):
+            raise RuntimeError(f"Firefox manager did not render fixture cookies: {manager_state_data}")
 
         grouped_domains = client.evaluate(
             frame["consoleActor"],
@@ -245,28 +254,45 @@ def main():
                 cookieList: [...document.querySelectorAll('#cookie-list li')].map(li => li.textContent.trim())
             })""",
         )
+        host_cookie_state_data = json.loads(host_cookie_state)
         results.append({
             "check": "select-host-cookie",
             "status": "passed",
-            "details": json.loads(host_cookie_state),
+            "details": host_cookie_state_data,
         })
+        if not (
+            host_cookie_state_data["selectedDomain"] == "lvh.me"
+            and host_cookie_state_data["selectedName"] == "fixture_js_host"
+            and any("fixture_js_host" in cookie for cookie in host_cookie_state_data["cookieList"])
+        ):
+            raise RuntimeError(f"Firefox host cookie selection failed: {host_cookie_state_data}")
 
-        normalized_protect_state = client.evaluate(
+        protect_icon_class = client.evaluate(
             frame["consoleActor"],
-            """(() => {
-                const button = document.querySelector('#protect_button');
-                const icon = document.querySelector('#protect_button span');
-                if (icon.className.includes('unlock')) {
-                    button.click();
-                }
-                return JSON.stringify({protectIconClass: icon.className});
-            })()""",
+            "document.querySelector('#protect_button span').className",
         )
+        if "glyphicon-unlock" in protect_icon_class:
+            client.evaluate(frame["consoleActor"], "document.querySelector('#protect_button').click(); true")
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            normalized_protect_state = client.evaluate(
+                frame["consoleActor"],
+                "JSON.stringify({protectIconClass: document.querySelector('#protect_button span').className})",
+            )
+            normalized_protect_state_data = json.loads(normalized_protect_state)
+            if "glyphicon-lock" in normalized_protect_state_data["protectIconClass"]:
+                break
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("Firefox protection did not activate before timeout")
         results.append({
             "check": "protect-state-normalized",
             "status": "passed",
-            "details": json.loads(normalized_protect_state),
+            "details": normalized_protect_state_data,
         })
+        protect_icon_class = normalized_protect_state_data["protectIconClass"]
+        if "glyphicon-lock" not in protect_icon_class or "glyphicon-unlock" in protect_icon_class:
+            raise RuntimeError(f"Firefox protection did not activate: {normalized_protect_state_data}")
 
         client.navigate(frame["actor"], FIXTURE_URL)
         _, frame = get_selected_target(client)
@@ -286,6 +312,11 @@ def main():
                 "afterDeleteWait": after_delete,
             },
         })
+        if not ("fixture_js_host=" in before_delete and "fixture_js_host=" in after_delete):
+            raise RuntimeError(
+                "Firefox protected cookie did not survive page deletion: "
+                f"before={before_delete!r}, after={after_delete!r}"
+            )
 
         print(json.dumps({
             "ok": True,
