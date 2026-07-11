@@ -283,13 +283,15 @@ if (!fs.existsSync(CERT_PATH) || !fs.existsSync(KEY_PATH)) {
     process.exit(1);
 }
 
-http.createServer(requestHandler(false)).listen(HTTP_PORT, '0.0.0.0', () => {
+const LISTEN_HOST = process.env.CQM_FIXTURE_HOST || '127.0.0.1';
+
+http.createServer(requestHandler(false)).listen(HTTP_PORT, LISTEN_HOST, () => {
     console.log(`HTTP fixture server listening on http://lvh.me:${HTTP_PORT}/`);
 });
 
 https.createServer({
     cert: fs.readFileSync(CERT_PATH),
     key: fs.readFileSync(KEY_PATH),
-}, requestHandler(true)).listen(HTTPS_PORT, '0.0.0.0', () => {
+}, requestHandler(true)).listen(HTTPS_PORT, LISTEN_HOST, () => {
     console.log(`HTTPS fixture server listening on https://lvh.me:${HTTPS_PORT}/`);
 });

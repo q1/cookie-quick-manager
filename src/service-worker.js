@@ -1,5 +1,6 @@
 importScripts(
-    'static/js/browser-polyfill.min.js',
+    'browser-shim.js',
+    'core.js',
     'platform.js',
     'api.js',
     'background-script.js',

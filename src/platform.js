@@ -15,6 +15,8 @@ vAPI.isFirefox = typeof browser.runtime.getBrowserInfo === "function";
 vAPI.isIncognitoContext = browser.extension.inIncognitoContext === true;
 vAPI.supportsContextualIdentities = typeof browser.contextualIdentities?.query === "function";
 vAPI.supportsFirstPartyIsolation = typeof browser.privacy?.websites?.firstPartyIsolate?.get === "function";
+// Both declared browser baselines support CookiePartitionKey queries.
+vAPI.supportsPartitionedCookies = true;
 
 vAPI.default_stores = vAPI.isFirefox ? [
     {
@@ -60,6 +62,11 @@ vAPI.privateStoreId = function() {
     return vAPI.default_stores[1].cookieStoreId;
 }
 
+vAPI.currentContextStoreId = function() {
+    return vAPI.storeIds?.[0] ||
+        (vAPI.isIncognitoContext ? vAPI.privateStoreId() : vAPI.defaultStoreId());
+}
+
 vAPI.isDefaultStoreId = function(storeId) {
     return storeId === vAPI.defaultStoreId();
 }
@@ -78,7 +85,7 @@ vAPI.getTabCookieStoreId = function(tabId) {
                 return store.id;
         }
 
-        return vAPI.defaultStoreId();
+        return vAPI.currentContextStoreId();
     });
 }
 

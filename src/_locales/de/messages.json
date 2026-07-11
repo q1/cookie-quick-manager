@@ -380,6 +380,16 @@
     }
   },
 
+  "cookieRestoredExpiredSkipped": {
+    "message": "$number$ abgelaufene Cookie(s) übersprungen.",
+    "description": "Importergebnis für Cookies, deren Ablaufdatum bereits überschritten ist.",
+    "placeholders": {
+      "number": {
+        "content": "$1"
+      }
+    }
+  },
+
   "cookieRestoredError": {
     "message": "Fehler, kein Cookie wiederhergestellt.<br>$json_error$",
     "description": "Alert when a file is imported with an error from the json parser.",
@@ -391,10 +401,10 @@
   },
 
   "cookieRestoredSingleError": {
-    "message": "Fehler, mindestens ein Cookie konnte nicht wiederhergestellt werden:<br>$error$<br>Keine Sorge; die meiste Zeit diese sind Session-Cookies, die abgelaufen sind.",
-    "description": "Alert when a file is imported with an error during the save process.",
+    "message": "$number$ Cookie(s) konnten nicht wiederhergestellt werden.",
+    "description": "Import result for cookies that the browser rejected.",
     "placeholders": {
-      "error" : {
+      "number" : {
         "content" : "$1"
       }
     }
@@ -439,7 +449,7 @@
   },
 
   "oPrevent_protected_cookies_deletion": {
-    "message": " Verhindern, dass Websites geschützte Cookies löschen, auch wenn diese abgelaufen sind",
+    "message": " Verhindern, dass Websites geschützte Cookies ausdrücklich löschen",
     "description": "Settings page: Checkbox"
   },
 
@@ -595,6 +605,41 @@
     "description": "Popup menu: Search and edit cookies in the main interface of CQM"
   },
 
+  "cPartitionKey": {
+    "message": "Partitionsschlüssel",
+    "description": "Partition key field in the cookie details panel."
+  },
+
+  "oFpiLabel": {
+    "message": "First-Party-Isolation",
+    "description": "First-Party Isolation option label."
+  },
+
+  "oFpiAvailability": {
+    "message": "First-Party-Isolation ist nur verfügbar, wenn die Firefox-Datenschutz-API sie bereitstellt.",
+    "description": "First-Party Isolation availability notice."
+  },
+
+  "oFpiDescription": {
+    "message": "Die Einstellung firstPartyIsolate ordnet Drittanbieterdaten der Domain in der Adressleiste zu. Dies begrenzt websiteübergreifendes Tracking, kann aber Drittanbieter-Anmeldungen beeinträchtigen.",
+    "description": "Explanation of First-Party Isolation."
+  },
+
+  "oFpiMoreInfo": {
+    "message": "Weitere Informationen im",
+    "description": "Text before the First-Party Isolation documentation link."
+  },
+
+  "oFpiMdnLink": {
+    "message": "Mozilla Developer Network",
+    "description": "First-Party Isolation documentation link text."
+  },
+
+  "oFpiFirefoxOnly": {
+    "message": "Dieses Steuerelement ist nur in Firefox verfügbar und wird in Chromium ausgeblendet.",
+    "description": "Browser support notice for First-Party Isolation."
+  },
+
   "popupDeleteCurrentCookies": {
     "message": "Aktuelles Cookie löschen",
     "description": "Popup menu: Delete current Site Cookies"
@@ -613,6 +658,31 @@
   "popupOptions": {
     "message": "Optionen",
     "description": "Popup menu: go to options page"
+  },
+
+  "contextMenu_domain_protect_session": {
+    "message": "Sitzungscookies schützen",
+    "description": "Option for the contextual menu that opens on a domain."
+  },
+
+  "contextMenu_domain_unprotect_session": {
+    "message": "Schutz für Sitzungscookies aufheben",
+    "description": "Option for the contextual menu that opens on a domain."
+  },
+
+  "menu_protect_session": {
+    "message": "Sitzungscookies schützen",
+    "description": "Dropdown menu option."
+  },
+
+  "menu_unprotect_session": {
+    "message": "Schutz für Sitzungscookies aufheben",
+    "description": "Dropdown menu option."
+  },
+
+  "tooltip_cSameSite": {
+    "message": "Teilweiser Schutz vor Cross-Site Request Forgery (CSRF) und Cross-Site Script Inclusion (XSSI).<br>Im strikten Modus wird das Cookie nur bei Anfragen gesendet, die von der Website stammen, von der das Cookie gesetzt wurde.",
+    "description": "Select menu to modify the sameSite cookie flag."
   }
 
 }

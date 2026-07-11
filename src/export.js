@@ -29,6 +29,7 @@
 }(function($, vAPI, window, document) {
 
     // The $ is now locally scoped
+    const core = window.CQMCore;
     $(function () {
 
 /*********** Events attached to UI elements ***********/
@@ -133,7 +134,7 @@ browser.storage.onChanged.addListener(function (changes, area) {
 
     // Reload template
     if (changes.template !== undefined)
-        cookie_clipboard_template = vAPI.templates[changes.template.newValue];
+        cookie_clipboard_template = vAPI.templates[changes.template.newValue] || vAPI.template_JSON;
 });
 
 /*********** Initializations ***********/
@@ -191,7 +192,7 @@ function display_json_in_clipboard_area(cookies_promise) {
         // Merge and display templates, update title with the number of cookies
         $('#clipboard_textarea').val(get_concatenated_content(templates));
         // Count cookies displayed (not subdomains filtered)
-        let title = browser.i18n.getMessage("modalClipboardTitle", templates.length);
+        let title = browser.i18n.getMessage("modalClipboardTitle", String(templates.length));
         $('#modal_clipboard h4.modal-title').text(title);
 
     }, (error) => {
@@ -218,6 +219,10 @@ function build_cookie_dump() {
         storeId: $('#store').val(),
         firstPartyDomain: $('#fpi-domain').val(),
     };
+    const selectedCookie = $('#cookie-list').find('li.active').data('cookie');
+    if (selectedCookie?.partitionKey && selectedCookie.domain === cookie.domain &&
+        selectedCookie.name === cookie.name)
+        cookie.partitionKey = selectedCookie.partitionKey;
 
     // If raw is true, return the unix timestamp if the cookie is not a session cookie
     // otherwise, return 0.
@@ -265,8 +270,8 @@ function build_domain_dump(cookie) {
         //   .foo.com => subdomains
         //   www.foo.com => host-only
         if (raw) {
-            // Return false if cookie is also valid for subdomains
-            return cookie.hostOnly;
+            // Netscape's include-subdomains column is the inverse of hostOnly.
+            return cookie_clipboard_template.name === 'NETSCAPE' ? !cookie.hostOnly : cookie.hostOnly;
         }
         return (cookie.hostOnly) ? "Valid for host only" : "Valid for subdomains";
     }
@@ -280,11 +285,8 @@ function build_domain_dump(cookie) {
         return (cookie.secure) ? "Encrypted connections only" : "Any type of connection";
     }
 
-    // Make a local copy of the template
-    var template_temp = cookie_clipboard_template.template;
-
     var params = {
-        '{HOST_RAW}': vAPI.getHostUrl(cookie),
+        '{HOST_RAW}': core.getCookieUrl(cookie),
         '{DOMAIN_RAW}': cookie.domain,
         '{NAME_RAW}': secure_string(cookie.name),
         '{PATH_RAW}': cookie.path,
@@ -296,10 +298,35 @@ function build_domain_dump(cookie) {
         '{ISHTTPONLY_RAW}': cookie.httpOnly,
         '{SAMESITE_RAW}': cookie.sameSite ? cookie.sameSite : "unspecified",
         '{ISDOMAIN}': get_domain_status(false),
-        '{ISDOMAIN_RAW}': cookie.hostOnly,
+        '{ISDOMAIN_RAW}': get_domain_status(true),
         '{STORE_RAW}': cookie.storeId,
         '{FPI_RAW}': cookie.firstPartyDomain ? cookie.firstPartyDomain : "", // This attr is absent on old FF
     };
+
+    if (cookie_clipboard_template.name === 'JSON') {
+        const exportedCookie = {
+            'Host raw': params['{HOST_RAW}'],
+            'Name raw': cookie.name,
+            'Path raw': cookie.path,
+            'Content raw': cookie.value,
+            'Expires': params['{EXPIRES}'],
+            'Expires raw': String(params['{EXPIRES_RAW}']),
+            'Send for': params['{ISSECURE}'],
+            'Send for raw': String(params['{ISSECURE_RAW}']),
+            'HTTP only raw': String(cookie.httpOnly),
+            'SameSite raw': cookie.sameSite || 'unspecified',
+            'This domain only': params['{ISDOMAIN}'],
+            'This domain only raw': String(cookie.hostOnly),
+            'Store raw': cookie.storeId,
+            'First Party Domain': cookie.firstPartyDomain || '',
+        };
+        if (cookie.partitionKey)
+            exportedCookie['Partition key'] = cookie.partitionKey;
+        return JSON.stringify(exportedCookie, null, 2);
+    }
+
+    // Make a local copy of the Netscape template.
+    var template_temp = cookie_clipboard_template.template;
 
     // Replace variables in template
     for (let key_pattern in params) {
@@ -308,30 +335,11 @@ function build_domain_dump(cookie) {
         // http://www.ecma-international.org/publications/files/ECMA-ST/Ecma-262.pdf
         template_temp = template_temp.replace(key_pattern, function () {return params[key_pattern]});
     }
-    return template_temp;
-}
-
-function download(filename, text) {
-    /* bug for Firefox in panel ?
-     * This file is opened in place of the current window instead of downloaded...
-     * TODO: This function can be replaced with an iframe like in the event:
-     * $("#file_export").click(function() ...
-     */
-    var element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-    element.setAttribute('download', filename);
-
-    element.style.display = 'none';
-    document.body.appendChild(element);
-
-    element.click();
-
-    document.body.removeChild(element);
+    return cookie.httpOnly ? `#HttpOnly_${template_temp}` : template_temp;
 }
 
 function export_content_to_file(content) {
-    // Due do FF bug (cf download() function)
-    // We have to create an iframe to propose a file to the user
+    // Use an isolated iframe so the manager page is never replaced by the file.
 
     // Choose the right filename/filetype according to the selected export format
     let cookie_filename;
@@ -342,6 +350,7 @@ function export_content_to_file(content) {
     } else {
         cookie_filename = 'cookies.txt';
         cookie_filetype = 'text/plain';
+        content = `# Cookie Quick Manager Netscape v2\n${content}`;
     }
 
     var f = document.createElement('iframe');
@@ -360,34 +369,31 @@ function export_content_to_file(content) {
     document.body.appendChild(f);
 }
 
-function handleUploadedFile(content, mimetype) {
+async function handleUploadedFile(content, mimetype) {
     // Take a file content and dispatch it to the good parser
     // Handle errors due to parsers.
 
-    let cookies_promises;
-
-    // Detect format based on MimeType: JSON or Netscape
-    if (mimetype == "application/json")
-        cookies_promises = parseJSONFile(content);
-    else if (mimetype == "text/plain")
-        cookies_promises = parseNETSCAPEFile(content);
-    else {
-        console.error("handleUploadedFile:: MimeType not supported", mimetype);
-        return;
-    }
-
-    cookies_promises.then((promises) => {
-        add_cookies(promises);
-    }, (error) => {
-        // Parser error (JSON)
-        set_info_text(browser.i18n.getMessage("cookieRestoredError", error));
+    try {
+        if (content.length > 10 * 1024 * 1024)
+            throw new Error('Import files are limited to 10 MiB.');
+        const normalizedContent = content.startsWith('\uFEFF') ? content.slice(1) : content;
+        const trimmed = normalizedContent.trimStart();
+        const looksLikeJson = trimmed.startsWith('[') || trimmed.startsWith('{');
+        let cookieDetails;
+        if (mimetype === 'application/json' || looksLikeJson)
+            cookieDetails = await parseJSONFile(normalizedContent);
+        else if (!mimetype || mimetype === 'text/plain')
+            cookieDetails = await parseNETSCAPEFile(normalizedContent);
+        else
+            throw new Error(`Unsupported file type: ${mimetype}`);
+        await add_cookies(cookieDetails);
+    } catch (error) {
+        set_info_text(browser.i18n.getMessage("cookieRestoredError", String(error?.message || error)));
         $('#modal_info').modal('show');
-    }).catch((error) => {
-        console.error("Unexpected error:", error);
-    });
+    }
 }
 
-function parseNETSCAPEFile(content) {
+async function parseNETSCAPEFile(content) {
 /* Parse Netscape file and return a list of cookies.set promises.
  * NOTE: About default values. The netscape format is less rich than the JSON format,
  * thus some features of the cookies are lost and are replaced by default values when inserting.
@@ -402,181 +408,155 @@ function parseNETSCAPEFile(content) {
  * '{DOMAIN_RAW}\t{ISDOMAIN_RAW}\t{PATH_RAW}\t{ISSECURE_RAW}\t{EXPIRES_RAW}\t{NAME_RAW}\t{CONTENT_RAW}'
  */
 
-    return new Promise((resolve, reject) => {
-
-        // Build cookies
-        vAPI.FPI_detection().then(() => {
-            // Parse lines of the file
-            let lines = content.split(/\r\n|\n/);
-            let line;
-
-            let promises = [];
-            for(let i=0, n=lines.length; i < n; i++){
-                // Tabulated file only
-                line = lines[i].split('\t');
-
-                // Skip empty lines or comments
-                if (line.length != 7 || line[0] == '#') {
-                    console.error(`Error: Skip line ${i + 1}`);
-                    continue;
-                }
-
-                // Get data from columns
-                let params = {
-                    domain: line[0],
-                    hostOnly: (line[1].toLowerCase() == "true"),
-                    path: line[2],
-                    secure: (line[3].toLowerCase() == "true"),
-                    name: line[5],
-                    value: line[6],
-                };
-
-                if ($('#search_store').val() != "all")
-                    // If context is all: let the browser select the default context
-                    params.storeId = $('#search_store').val();
-
-
-                if (line[4] != 0) {
-                    // expirationDate is not provided for session cookies
-                    // If omitted, the cookie becomes a session cookie.
-                    let expirationDate = parseInt(line[4], 10);
-
-                    if (isNaN(expirationDate)) {
-                        console.error(`Error during the parse of expiration date: Skip line ${i + 1}`);
-                        continue;
-                    } else if (expirationDate <= ((Date.now() / 1000|0) + 1))
-                        // Refuse expired cookies
-                        continue;
-
-                    params.expirationDate = expirationDate;
-                }
-
-                if (vAPI.FPI !== undefined)
-                    // FPI enabled or disabled but supported
-                    // firstPartyDomain can be set
-                    // If it is not a FPI cookie, set empty string ""
-                    params.firstPartyDomain = "";
-
-                // Set Url
-                params.url = vAPI.getHostUrl(params); // use attrs: secure, domain, path
-
-                // hostOnly flag is automatically set according to the presence
-                // of the leading point in the url
-                delete params["domain"];
-
-                // Not an expected param
-                delete params["hostOnly"];
-
-                promises.push(browser.cookies.set(params));
-            }
-            resolve(promises);
-        });
+    await vAPI.FPI_detection();
+    const details = [];
+    const lines = content.split(/\r?\n/);
+    const formatMarker = '# Cookie Quick Manager Netscape v2';
+    const versionedCqmFlags = lines.some((candidate) => candidate.trim() === formatMarker);
+    const legacyCqmFlags = !versionedCqmFlags && lines.some((candidate) => {
+        const fields = candidate.replace(/^#HttpOnly_/, '').split('\t');
+        return fields.length === 7 && fields[0].startsWith('.') && !core.parseBoolean(fields[1]);
     });
-}
-
-function parseJSONFile(content) {
-    // Parse JSON file and return a list of cookies.set promises.
-
-    return new Promise((resolve, reject) => {
-
-        try {
-            // Throw SyntaxError if JSON is not correctly formatted
-            var json_content = JSON.parse(content);
-        } catch (error) {
-                // PS: if (error instanceof SyntaxError)
-                console.error(error);
-                reject(error);
-                return;
+    let cookieRowCount = 0;
+    let expiredCount = 0;
+    for (let index = 0; index < lines.length; index++) {
+        let rawLine = lines[index];
+        if (!rawLine.trim())
+            continue;
+        let httpOnly = false;
+        if (rawLine.startsWith('#HttpOnly_')) {
+            httpOnly = true;
+            rawLine = rawLine.slice('#HttpOnly_'.length);
+        } else if (rawLine.startsWith('#')) {
+            continue;
         }
 
-        // Build cookies
-        vAPI.FPI_detection().then(() => {
-            //console.log(vAPI.FPI);
+        const line = rawLine.split('\t');
+        if (line.length !== 7)
+            throw new Error(`Invalid Netscape cookie at line ${index + 1}.`);
+        cookieRowCount++;
+        if (cookieRowCount > 10000)
+            throw new RangeError('A single import is limited to 10,000 cookies.');
+        const expirationDate = Number.parseInt(line[4], 10);
+        if (!Number.isFinite(expirationDate))
+            throw new Error(`Invalid expiration date at line ${index + 1}.`);
+        if (expirationDate !== 0 && expirationDate <= (Math.floor(Date.now() / 1000) + 1)) {
+            expiredCount++;
+            continue;
+        }
 
-            let promises = [];
-            for (let json_cookie of json_content) {
-                let params = {
-                    url: json_cookie["Host raw"],
-                    name: json_cookie["Name raw"],
-                    value: json_cookie["Content raw"],
-                    path: json_cookie["Path raw"],
-                    httpOnly: (json_cookie["HTTP only raw"] === 'true'),
-                    secure: (json_cookie["Send for raw"] === 'true'),
-                    storeId: (json_cookie["Private raw"]  === 'true') ? vAPI.privateStoreId() : vAPI.defaultStoreId(),
-                };
-
-                if (json_cookie["SameSite raw"] !== undefined) {
-                    let sameSite = json_cookie["SameSite raw"];
-
-                    if (sameSite !== "unspecified" && !(sameSite == "no_restriction" && !params.secure))
-                        params['sameSite'] = sameSite;
-                }
-
-                if (json_cookie["Store raw"] !== undefined) {
-                    params['storeId'] = json_cookie["Store raw"];
-                }
-
-                // expirationDate is not provided for session cookies
-                // If omitted, the cookie becomes a session cookie.
-                if (json_cookie["Expires raw"] != "0") {
-                    // Refuse expired cookies
-                    let expirationDate = parseInt(json_cookie["Expires raw"], 10);
-                    if (expirationDate <= ((Date.now() / 1000|0) + 1))
-                        continue;
-
-                    params['expirationDate'] = expirationDate;
-                }
-
-                if (vAPI.FPI !== undefined) {
-                    // FPI enabled or disabled but supported
-                    // firstPartyDomain can be set
-                    // If it is not a FPI cookie, set empty string ""
-                    params['firstPartyDomain'] = (json_cookie["First Party Domain"]) ? json_cookie["First Party Domain"] : "";
-                }
-
-                promises.push(browser.cookies.set(params));
-            }
-            resolve(promises);
-        });
-    });
+        const cookie = {
+            domain: line[0],
+            hostOnly: line[0].startsWith('.') ? false :
+                (legacyCqmFlags ? core.parseBoolean(line[1], true) : !core.parseBoolean(line[1])),
+            path: line[2],
+            secure: core.parseBoolean(line[3]),
+            httpOnly,
+            name: line[5],
+            value: line[6],
+            session: expirationDate === 0,
+        };
+        if (!cookie.session)
+            cookie.expirationDate = expirationDate;
+        if ($('#search_store').val() !== 'all')
+            cookie.storeId = $('#search_store').val();
+        if (vAPI.FPI !== undefined)
+            cookie.firstPartyDomain = '';
+        details.push(core.buildCookieSetDetails(cookie));
+    }
+    details.expiredCount = expiredCount;
+    return details;
 }
 
-function add_cookies(promises) {
+async function parseJSONFile(content) {
+    // Parse JSON file and return a list of cookies.set promises.
+
+    const parsed = JSON.parse(content);
+    const jsonCookies = Array.isArray(parsed) ? parsed :
+        (parsed && parsed.format === 'cookie-quick-manager' && Array.isArray(parsed.cookies) ? parsed.cookies : null);
+    if (!jsonCookies)
+        throw new TypeError('Cookie JSON must be an array or a Cookie Quick Manager export object.');
+    if (jsonCookies.length > 10000)
+        throw new RangeError('A single import is limited to 10,000 cookies.');
+
+    await vAPI.FPI_detection();
+    const defaultStoreId = $('#search_store').val() !== 'all' ?
+        $('#search_store').val() : vAPI.currentContextStoreId();
+    const detailsList = [];
+    let expiredCount = 0;
+    for (const record of jsonCookies) {
+        try {
+            const details = core.parseJsonCookieRecord(record, {
+                defaultStoreId,
+                supportsFirstPartyIsolation: vAPI.FPI !== undefined,
+            });
+            if (details.storeId && vAPI.storeIds.length && !vAPI.storeIds.includes(details.storeId))
+                details.storeId = defaultStoreId;
+            detailsList.push(details);
+        } catch (error) {
+            if (error?.code === 'EXPIRED') {
+                expiredCount++;
+                continue;
+            }
+            throw error;
+        }
+    }
+    detailsList.expiredCount = expiredCount;
+    return detailsList;
+}
+
+async function add_cookies(cookieDetails) {
     // Take a list of cookie.set promises and execute them
     // Cookies are protected on the fly according to the option "Protect cookies during import"
     // Handle errors due to the insertion of cookies.
 
-    let cookies_number = promises.length;
+    const items = await browser.storage.local.get({import_protected_cookies: false});
+    const results = [];
+    for (let index = 0; index < cookieDetails.length; index += 50) {
+        const batch = cookieDetails.slice(index, index + 50);
+        results.push(...await Promise.allSettled(batch.map((details) => vAPI.set_cookie(details))));
+    }
+    const addedCookies = results
+        .filter((result) => result.status === 'fulfilled' && result.value)
+        .map((result) => result.value);
+    const failedCount = results.length - addedCookies.length;
+    if (items.import_protected_cookies && addedCookies.length) {
+        try {
+            await vAPI.set_cookie_protection(addedCookies, true);
+        } catch (error) {
+            // Import succeeded; a follow-up protection failure must not be
+            // presented as though the cookies themselves were not restored.
+            console.error('Failed to protect imported cookies:', error);
+        }
+    }
 
-    // Handle import_protected_cookies global option
-    var get_settings = browser.storage.local.get({
-        import_protected_cookies: false
-    });
-
-    get_settings.then((items) => {
-        //console.log(items);
-        //console.log(vAPI.FPI);
-
-        return vAPI.add_cookies(Promise.all(promises), items.import_protected_cookies);
-
-    })
-    .then((ret) => {
-        // Display modal info
-        set_info_text(browser.i18n.getMessage("cookieRestoredSuccess", cookies_number));
-        // Actualize interface
-        $("#actualize_button").click();
-        $('#modal_info').modal('show');
-    }, (error) => {
-        console.error({AddError: error});
-        set_info_text(browser.i18n.getMessage("cookieRestoredSingleError", error));
-        // If null: no error but no save
-        $("#actualize_button").click();
-        $('#modal_info').modal('show');
-    });
+    const expiredCount = Number(cookieDetails.expiredCount) || 0;
+    const messages = [];
+    if (addedCookies.length)
+        messages.push(browser.i18n.getMessage('cookieRestoredSuccess', String(addedCookies.length)));
+    if (failedCount)
+        messages.push(browser.i18n.getMessage('cookieRestoredSingleError', String(failedCount)));
+    if (expiredCount)
+        messages.push(browser.i18n.getMessage('cookieRestoredExpiredSkipped', String(expiredCount)));
+    if (!messages.length) {
+        const successMessage = browser.i18n.getMessage('cookieRestoredSuccess', String(addedCookies.length));
+        messages.push(successMessage);
+    }
+    set_info_text(messages.join('<br>'));
+    $('#actualize_button').click();
+    $('#modal_info').modal('show');
+    return {added: addedCookies.length, failed: failedCount, expired: expiredCount};
 }
 
 function set_info_text(content) {
-    $('#info_text').html(content);
+    const infoText = document.getElementById('info_text');
+    infoText.replaceChildren();
+    const chunks = String(content).split(/<br\s*\/?\s*>/i);
+    chunks.forEach((chunk, index) => {
+        if (index)
+            infoText.appendChild(document.createElement('br'));
+        infoText.appendChild(document.createTextNode(chunk));
+    });
 }
 
 function get_options() {

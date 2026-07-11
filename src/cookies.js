@@ -29,11 +29,15 @@
 }(function($, vAPI, window, document) {
 
     // The $ is now locally scoped
+    const core = window.CQMCore;
     $(function () {
 
 /*********** Events attached to UI elements ***********/
 // Search box: handle keyboard inputs
-$('#search_domain').on('input', actualizeDomains);
+$('#search_domain').on('input', function() {
+    parentHostnameFilter = '';
+    actualizeDomains();
+});
 $('#search_domain').keypress(function(e) {
     // Enter key pressed
     if(e.which == 13)
@@ -105,14 +109,20 @@ $("#save_button").click(function() {
      * https://www.mxsasha.eu/blog/2014/03/04/definitive-guide-to-cookie-domains/
      */
     var params = {
-        url: vAPI.getHostUrl_from_UI(),
+        domain: $('#domain').val(),
+        hostOnly: !$('#domain').val().trim().startsWith('.'),
         name: $('#name').val(),
         value: $('#value').val(),
         path: $('#path').val(),
         httpOnly: $('#httponly').is(':checked'),
         secure: $('#issecure').is(':checked'),
+        session: $('#issession').is(':checked'),
         storeId: $('#store').val(),
     };
+    const selectedCookie = $('#cookie-list').find('li.active').data('cookie');
+    if (selectedCookie?.partitionKey && selectedCookie.domain === params.domain &&
+        selectedCookie.name === params.name)
+        params.partitionKey = selectedCookie.partitionKey;
 
     // Handle optional sameSite flag if supported
     let $samesite_val = $('#samesite').val();
@@ -157,12 +167,10 @@ $("#save_button").click(function() {
             params['firstPartyDomain'] = $('#fpi-domain').val();
         }
 
-        return browser.cookies.set(params);
+        return vAPI.set_cookie(core.buildCookieSetDetails(params));
     })
     .then((cookie) => {
         // Reactivate the interface
-        console.log({"Cookie saved: ": cookie});
-
         // If null: no error but no save
         // => display button content in red
         if (cookie === null) {
@@ -210,36 +218,22 @@ $("#delete_button").click(function() {
 
 $("#protect_button").click(function() {
     // Update the protect status of the current cookie
-
-    // Do nothing if no cookie is selected
-    let domain = $("#domain").val();
-    let name = $('#name').val();
-    if (name == '')
+    const cookie = $('#cookie-list').find('li.active').data('cookie');
+    if (!cookie)
         return;
-
-    // Check domain
-    if (!(domain in protected_cookies))
-        protected_cookies[domain] = [];
-    // Check name
-    if (protected_cookies[domain].indexOf(name) === -1) {
-        // This cookie will be protected
-        protected_cookies[domain].push(name);
-
-        set_protect_lock_icon(true);
-    } else {
-        // This cookie will not be protected anymore
-        protected_cookies[domain] = protected_cookies[domain].filter(item => ![name,].includes(item));
-
-        set_protect_lock_icon(false);
-    }
-    //console.log(protected_cookies);
-    // Set new protected_cookies on storage area
-    browser.storage.local.set({"protected_cookies": protected_cookies})
-    .then((ret) => {
+    const $button = $(this);
+    const protect = !core.isCookieProtected(cookie, protected_cookies);
+    $button.prop('disabled', true);
+    vAPI.set_cookie_protection([cookie], protect)
+    .then((updatedProtectedCookies) => {
+        protected_cookies = updatedProtectedCookies;
+        set_protect_lock_icon(protect);
+        last_selected_cookie_index = $('#cookie-list').find('li.active').index();
         // Simulate click on domain
         $('#domain-list').find('li.active').click();
-    }, onError)
-    .catch(err => console.error(err));
+    })
+    .catch(onError)
+    .finally(() => $button.prop('disabled', false));
 });
 
 $("#delete_all_button").click(
@@ -308,6 +302,8 @@ $(document).keydown(function(event){
 
     // Delete current cookie with suppr or command + backspace (MacOS)
     if ((key == 46) || (event.metaKey && (key == 8))) {
+        if ($(event.target).is('input, textarea, select, [contenteditable="true"]'))
+            return;
         delete_current_cookie();
         return;
     }
@@ -506,7 +502,9 @@ browser.storage.onChanged.addListener(function (changes, area) {
     // Reload protected_cookies
     if (changes['protected_cookies'] !== undefined)
         // TODO: Add lock badge on displayed cookies if needed...
-        protected_cookies = changes.protected_cookies.newValue;
+        vAPI.get_protected_cookies().then((value) => { protected_cookies = value; }).catch(onError);
+    if (Object.keys(changes).some((key) => core.isProtectionStorageKey(key)))
+        vAPI.get_protected_cookies().then((value) => { protected_cookies = value; }).catch(onError);
 
     // Load/remove css skin
     if (changes['skin'] !== undefined)
@@ -515,7 +513,7 @@ browser.storage.onChanged.addListener(function (changes, area) {
     // Ability to show a modal alert
     // when a user wants to delete all cookies from at least 1 context
     if (changes['display_deletion_alert'] !== undefined)
-        display_deletion_alert = changes.display_deletion_alert.newValue;
+        display_deletion_alert = changes.display_deletion_alert.newValue !== false;
 });
 
 $('#domain-list').focus(function() {
@@ -611,7 +609,7 @@ $('#domain-list').contextMenu({
                         vAPI.getCookiesFromSelectedDomain(),
                         false,
                         $(this),
-                        false
+                        true
                     );
                 }
             },
@@ -692,11 +690,8 @@ if (!vAPI.supportsFirstPartyIsolation)
 // Set default domain in search box
 setDefaultDomain();
 
-// Init protected_cookies array in global context and load options from storage
-get_options();
-
-// Fill the domains list
-get_stores();
+// Load settings before rendering so protection badges never race initialization.
+get_options().then(get_stores).catch(onError);
 
 // Focus on the main default list: #domain-list
 $current_selected_list.focus();
@@ -813,9 +808,9 @@ function adjust_scrollbar($current) {
 function uniqueDomains(cookies) {
     /* Return a dict with domains as keys and storeIds and number of cookies for that domain.
      */
-    var domains = {};
+    var domains = Object.create(null);
     for (let cookie of cookies) {
-        if (cookie.domain in domains) {
+        if (Object.hasOwn(domains, cookie.domain)) {
             domains[cookie.domain]['number']++;
             if (domains[cookie.domain]['storeIds'].indexOf(cookie.storeId) === -1) {
                 domains[cookie.domain]['storeIds'].push(cookie.storeId);
@@ -831,41 +826,32 @@ function uniqueDomains(cookies) {
 
 function filter_master_domains(domains) {
     // Return a dict only with domains that are on top of other subdomains
+    const domainNames = Object.keys(domains);
+    const normalize = (domain) => domain.replace(/^\./, '').toLowerCase();
+    const grouped = Object.create(null);
 
-    let unique_domains = Object.keys(domains);
-    let non_master_domains = [];
-    unique_domains.forEach(function(domain){
-        unique_domains.forEach(function(other_domain){
-            // "":
-            // do not deal with cookies with an empty a domain name
-            // (cookies created from a local file:// page)
-            if (domain == other_domain || other_domain == "")
-                return;
-            // recherche des domaines ne contenant pas d'autres domaines
-            if (domain.indexOf(other_domain) !== -1) {
-                // other_domain trouvé dans domain => domain n'est pas un master
-                // ex: github.com trouvé dans .github.com => .github.com n'est pas master
-                // On ajoute donc les données de .github.com à github.com
-                //console.log({found: other_domain, in_: domain});
-                non_master_domains.push(domain);
-                domains[other_domain].number += domains[domain].number;
-            }
+    for (const domain of domainNames) {
+        const normalizedDomain = normalize(domain);
+        const parents = domainNames.filter((candidate) => {
+            const normalizedCandidate = normalize(candidate);
+            return normalizedCandidate &&
+                (normalizedDomain === normalizedCandidate || normalizedDomain.endsWith(`.${normalizedCandidate}`));
+        }).sort((left, right) => {
+            const lengthDifference = normalize(left).length - normalize(right).length;
+            if (lengthDifference)
+                return lengthDifference;
+            return Number(left.startsWith('.')) - Number(right.startsWith('.'));
         });
-    });
-
-    // Remove non master domains from unique domains
-    unique_domains = unique_domains.filter(function(el) {
-        return !non_master_domains.includes(el);
-    });
-    //console.log({not_master: non_master_domains});
-    //console.log({master: unique_domains});
-
-    // Rebuild filtered domains
-    let full_master_domains = {};
-    for (let domain of unique_domains) {
-        full_master_domains[domain] = domains[domain];
+        const master = parents[0] || domain;
+        if (!grouped[master])
+            grouped[master] = {number: 0, storeIds: []};
+        grouped[master].number += domains[domain].number;
+        for (const storeId of domains[domain].storeIds) {
+            if (!grouped[master].storeIds.includes(storeId))
+                grouped[master].storeIds.push(storeId);
+        }
     }
-    return full_master_domains;
+    return grouped;
 }
 
 function showStores(stores) {
@@ -900,10 +886,10 @@ function showStores(stores) {
                 },
             });
             $elem.addClass("glyphicon glyphicon-store");
-            $obj.append($('<option/>', {
-                value: store.cookieStoreId,
-                html : $elem,
-            }).append(store.name));
+            const $option = $('<option/>', {value: store.cookieStoreId});
+            $option.append($elem);
+            $option.append(document.createTextNode(store.name));
+            $obj.append($option);
         }
     }
 
@@ -1025,7 +1011,7 @@ function callback_delete_cookies(delete_button_selector) {
     // or directly on 'ask_total_deletion_button' in the UI if 'display_deletion_alert' is false.
     // delete_button_selector can be undefined if #ask_total_deletion_button is not clicked
 
-    let promise = vAPI.get_all_cookies([$('#search_store').val()]);
+    let promise = vAPI.filter_cookies(vAPI.get_all_cookies([$('#search_store').val()]));
     delete_cookies(promise, delete_button_selector);
 }
 
@@ -1046,7 +1032,7 @@ function no_cookie_alert($list) {
     $current_selected_list = $('#domain-list');
 }
 
-function get_options() {
+async function get_options() {
     // Get options from storage and import them in the global context
     // Init protected_cookies array
     // Load css stylesheet
@@ -1058,7 +1044,7 @@ function get_options() {
         display_deletion_alert: true,
         auto_actualize_checkbox: false,
     });
-    get_settings.then((items) => {
+    const items = await get_settings;
         //console.log({storage_data: items});
 
         // Set auto-actualize checkbox status
@@ -1066,7 +1052,7 @@ function get_options() {
             $("#auto_actualize_checkbox").click();
 
         // Reload protected_cookies
-        protected_cookies = vAPI.get_and_patch_protected_cookies(items);
+        protected_cookies = await vAPI.get_protected_cookies();
 
         // Load/remove css skin
         if (items.skin != 'default')
@@ -1075,7 +1061,6 @@ function get_options() {
         // Ability to show a modal alert
         // when a user wants to delete all cookies from at least 1 context
         display_deletion_alert = items.display_deletion_alert;
-    });
 }
 
 function disable_cookie_details() {
@@ -1179,21 +1164,17 @@ function setDefaultDomain() {
 
     // Get parameter from full url
     let current_addon_url = new URL(window.location.href);
-    let parent_url = decodeURIComponent(current_addon_url.searchParams.get("parent_url"));
+    let parent_url = current_addon_url.searchParams.get("parent_url") || '';
     if (parent_url == "")
         return;
-    // Get domain from hostname without subdomain
-    // https://stackoverflow.com/questions/9752963/get-domain-name-without-subdomains-using-javascript
-    var splitted_domain = (new URL(parent_url)).hostname.replace(/^www\./, '').split('.');
-    while (splitted_domain.length > 3) {
-        splitted_domain.shift();
+    try {
+        // Preserve the exact hostname. Guessing registrable domains without a
+        // public-suffix list breaks IPv4, intranet hosts, and many ccTLDs.
+        parentHostnameFilter = (new URL(parent_url)).hostname.toLowerCase();
+        $('#search_domain').val(parentHostnameFilter);
+    } catch (error) {
+        console.warn('Ignoring invalid parent_url parameter.');
     }
-    if (splitted_domain.length === 3 && ((splitted_domain[1].length > 2 && splitted_domain[2].length > 2))) {
-        splitted_domain.shift();
-    }
-    var parent_domain = splitted_domain.join('.');
-    // Set searched domain to searchbox
-    $('#search_domain').val(parent_domain);
 }
 
 function showDomains(storeIds) {
@@ -1208,6 +1189,7 @@ function showDomains(storeIds) {
     // Set vAPI.query_domain, vAPI.query_names, vAPI.query_values
     // TODO move this ?? with filtering block in get_all_cookies
     vAPI.parse_search_query($('#search_domain').val());
+    vAPI.query_hostname = parentHostnameFilter;
 
     let searched_store = $('#search_store').val();
     let $domainList = $('#domain-list');
@@ -1276,7 +1258,9 @@ function showDomains(storeIds) {
             // TODO: workaround: attach all storeIds in case of someone creates a private cookie
             // in a domain with only default cookies => without these 2 ids, the private
             // cookie will be not displayed until user reloads the domains list.
-            $(li).bind('click', {id: domain_name, storeIds: /*domains[domain_name].*/storeIds}, showCookiesList);
+            $(li)
+                .data('domainQuery', {id: domain_name, storeIds: /*domains[domain_name].*/storeIds})
+                .on('click', {id: domain_name, storeIds: /*domains[domain_name].*/storeIds}, showCookiesList);
         });
         // Reset previous list
         $domainList.empty();
@@ -1375,9 +1359,19 @@ function showCookiesList(event, refresh_domain_badges) {
                 // Add text content
                 li.appendChild(content);
 
+                if (cookie.partitionKey?.topLevelSite) {
+                    const partitionBadge = document.createElement('span');
+                    partitionBadge.className = 'partition-badge badge';
+                    const ancestorScope = typeof cookie.partitionKey.hasCrossSiteAncestor === 'boolean' ?
+                        `hasCrossSiteAncestor=${cookie.partitionKey.hasCrossSiteAncestor}` :
+                        'hasCrossSiteAncestor=?';
+                    partitionBadge.textContent = `${cookie.partitionKey.topLevelSite} · ${ancestorScope}`;
+                    partitionBadge.title = `Partition: ${cookie.partitionKey.topLevelSite}; ${ancestorScope}`;
+                    li.appendChild(partitionBadge);
+                }
+
                 // Display a lock badge if cookie is protected
-                if (cookie.domain in protected_cookies
-                    && protected_cookies[cookie.domain].indexOf(cookie.name) !== -1) {
+                if (core.isCookieProtected(cookie, protected_cookies)) {
                     let lock_badge = document.createElement("span");
                     lock_badge.className = "lock-badge glyphicon glyphicon-lock";
                     li.appendChild(lock_badge);
@@ -1432,8 +1426,6 @@ function display_cookie_details(event) {
 
     // Get the current cookie object
     var cookie = $that.data("cookie");
-    console.log(cookie);
-
     // Reset value modifiers
     $("#toggle_url").removeClass("down");
     $("#toggle_b64").removeClass("down");
@@ -1444,6 +1436,11 @@ function display_cookie_details(event) {
     // Fill the fields
     $('#domain').val(cookie.domain);
     $('#fpi-domain').val(cookie.firstPartyDomain || "");
+    const partitionSite = cookie.partitionKey?.topLevelSite || '';
+    const partitionAncestor = typeof cookie.partitionKey?.hasCrossSiteAncestor === 'boolean' ?
+        `hasCrossSiteAncestor=${cookie.partitionKey.hasCrossSiteAncestor}` : '';
+    $('#partition-key').val([partitionSite, partitionAncestor].filter(Boolean).join(' — '));
+    $('#partition-key-row').toggle(Boolean(partitionSite));
     $('#name').val(cookie.name);
     $('#value').val(cookie.value);
     $('#path').val(cookie.path);
@@ -1490,8 +1487,7 @@ function display_cookie_details(event) {
 
     // If the cookie is not in protected_cookies array: display lock icon
     // otherwise, display unlock icon
-    if (protected_cookies[cookie.domain] === undefined ||
-        protected_cookies[cookie.domain].indexOf(cookie.name) === -1) {
+    if (!core.isCookieProtected(cookie, protected_cookies)) {
         // is not protected
         set_protect_lock_icon(false);
     } else {
@@ -1522,40 +1518,23 @@ function set_protect_lock_icon(status) {
 
 function delete_current_cookie() {
     /* Remove a cookie displayed on details zone
-     * NOTE: Remove inexistant cookie: Removed: null
+     * NOTE: vAPI.remove_cookie resolves to null if the cookie still exists
+     * (removal failed), and to the original cookie otherwise.
      * NOTE: This function does not try to delete protected cookie
      */
 
-    // DO NOT delete protected cookie
-    let cookie_domain = $('#domain').val();
-    let cookie_name = $('#name').val();
-    if (cookie_domain in protected_cookies
-        && protected_cookies[cookie_domain].indexOf(cookie_name) !== -1) {
+    const cookie = $('#cookie-list').find('li.active').data('cookie');
+    if (!cookie)
         return;
-    }
+    if (core.isCookieProtected(cookie, protected_cookies))
+        return;
 
-    var params = {
-      url: vAPI.getHostUrl_from_UI(),
-      name: cookie_name,
-      storeId: $('#store').val(),
-    }
-
-    vAPI.FPI_detection().then(() => {
-
-        if (vAPI.FPI !== undefined) {
-            // FPI supported
-            // firstPartyDomain is mandatory
-            params['firstPartyDomain'] = $('#fpi-domain').val();
-        }
-        return browser.cookies.remove(params);
-    })
+    vAPI.remove_cookie(cookie)
     .then((cookie) => {
         // Reactivate the interface
-        console.log({"Removed:": cookie});
-
         // If null: no error but no suppression
         // => display button content in red
-        if (cookie === null) {
+        if (cookie == null) {
             $("#delete_button span").addClass("button-error");
         } else {
             // OK
@@ -1630,6 +1609,8 @@ function update_skin(skin) {
     // Update skin if skin != 'default'
     // if skin == 'default' => remove the css stylesheet
 
+    if (!['default', 'hacker_style'].includes(skin))
+        skin = 'default';
     if (skin == 'default')
         $('#custom_theme').remove();
     else
@@ -1700,15 +1681,13 @@ var cookies_onChangedListener = (function(changeInfo) {
         // except for performance reasons (avoid asking for cookies of the domain and update only the
         // modified cookie...)
 
-        // Delete event or add event (and add event after overwrite event)
-        if (changeInfo.cause == 'explicit') {
-            // Simulate click on the same domain with recalculation of badges
-            // (because almost 1 new cookie is added, with maybe a new container)
-
-            // Keep index of the current to selected cookie; it will be restored in showCookiesList()
-            last_selected_cookie_index = $('#cookie-list').find('li.active').index();
-            $('#domain-list').find('li.active').trigger('click', true);
-        }
+        // Ignore only the first (removed) half of an overwrite; the following
+        // added event refreshes the row. Expiry, eviction, and website expiry
+        // tombstones must also remove stale rows from the UI.
+        if (changeInfo.removed && changeInfo.cause === 'overwrite')
+            return;
+        last_selected_cookie_index = $('#cookie-list').find('li.active').index();
+        $('#domain-list').find('li.active').trigger('click', true);
     } else {
         // The selected domain is different => reload everything
         // TODO: search the domain in the list and update its badges,
@@ -1724,9 +1703,12 @@ var $current_selected_list = $('#domain-list');
 // and set in $("#save_button").click()
 var last_selected_cookie_index;
 var context_menu_elements;
-var protected_cookies;
-var display_deletion_alert;
+var protected_cookies = Object.create(null);
+var display_deletion_alert = true;
 var addon_window_type;
+// Set only for a manager launched from the site-specific popup. Manual search
+// keeps its historical substring semantics.
+var parentHostnameFilter = '';
 // Init dict of storeIds with iconURl and color as values
-var storesData = {};
+var storesData = Object.create(null);
 }));

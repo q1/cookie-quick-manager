@@ -1,7 +1,10 @@
 dist/
 build/
+build-firefox/
 node_modules/
 qa/certs/
+__pycache__/
+*.py[cod]
 qa/firefox-baseline-extension/
 .playwright-cqm-profile/
 poc/

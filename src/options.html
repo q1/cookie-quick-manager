@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
-    <script src="static/js/browser-polyfill.min.js"></script>
+    <script src="browser-shim.js"></script>
+    <script src="core.js"></script>
     <script src="platform.js"></script>
     <link rel="stylesheet" href="static/css/bootstrap.min.css">
     <link rel="icon" href="icons/icon48.png"/>
@@ -111,20 +112,8 @@
               <label for="delete_all_on_restart" data-i18n-content="oDelete_all_on_restart"> Delete all cookies on restart</label>
               <span id="show_delete_all_on_restart" class="glyphicon glyphicon-info-sign ask_info"></span>
               <div id="delete_all_on_restart_info" class="info">
-                <p>Due to limitations (the deletion occurs 2 seconds after restarting the browser),
-                you will probably want to use the official option of Firefox:
-                <strong>Preferences/Privacy &amp; security</strong>, section <strong>History</strong>.
-                Set Firefox will to <strong>Use custom settings for history</strong>,
-                then select the checkbox for <strong>Clear history when Firefox closes</strong>.
-                Beside <strong>Clear history when Firefox closes</strong>, click the <strong>Settings…</strong> button.
-                The Settings for Clearing History window will open.
-                Finally put a check mark next to <strong>cookies</strong>.<br>
-                Please note that the native option of Firefox will <strong>delete all the cookies</strong>
-                even if they are protected.
-                </p><p>
-                To block and manage deletions and authorizations in a precise and efficient way,
-                it is <strong>strongly recommended</strong> to use the matrix-based firewall: <a href="https://addons.mozilla.org/fr/firefox/addon/umatrix/">uMatrix</a>.
-                </p>
+                <p>Cleanup runs once when the browser starts. Protected cookies are retained.
+                A browser-level “clear on close” policy may remove cookies before extensions can preserve them.</p>
               </div>
             </div>
             <div class="form-group row">
@@ -133,22 +122,17 @@
             </div>
             <div class="form-group row">
               <input type="checkbox" name="prevent_protected_cookies_deletion" id="prevent_protected_cookies_deletion">
-              <label for="prevent_protected_cookies_deletion" data-i18n-content="oPrevent_protected_cookies_deletion"> Prevent sites from clearing protected cookies, even if they are expired</label>
+              <label for="prevent_protected_cookies_deletion" data-i18n-content="oPrevent_protected_cookies_deletion"> Prevent sites from explicitly clearing protected cookies</label>
             </div>
             <div class="form-group row">
               <input type="checkbox" name="fpi_status" id="fpi_status">
-              <label for="fpi_status"> First-Party Isolation</label>
+              <label for="fpi_status" data-i18n-content="oFpiLabel">First-Party Isolation</label>
               <span id="show_fpi" class="glyphicon glyphicon-info-sign ask_info"></span>
               <div id="fpi_info" class="info">
-                <p><strong>/!\ This feature is not available on Firefox 59. Thus, the cookie API is quite broken with
-                it until Firefox 62 (not included). Because of that, on Firefox 60 and 61, the ability to join subdomains under one master domain is not available.</strong></p>
-                <p>The firstPartyIsolate preference makes the browser associate all data
-                (including cookies, HSTS data, cached images, and more) for any third party domains with
-                the domain in the address bar. This prevents third party trackers from using directly stored
-                information to identify the user across different websites, but may break websites where the
-                user logs in with a third party account (such as a Facebook or Google account).</p>
-                <p>More information at <a href="https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/cookies#First-party_isolation">Mozilla Developer Network</a>.</p>
-                <p><strong>This feature is fully functional from version 59 of Firefox</strong></p>
+                <p><strong data-i18n-content="oFpiAvailability">First-Party Isolation is available only when the Firefox privacy API exposes it.</strong></p>
+                <p data-i18n-content="oFpiDescription">The firstPartyIsolate preference associates third-party data with the domain in the address bar. This limits cross-site tracking but can break third-party sign-in.</p>
+                <p><span data-i18n-content="oFpiMoreInfo">More information at</span> <a href="https://developer.mozilla.org/en-US/Add-ons/WebExtensions/API/cookies#First-party_isolation" data-i18n-content="oFpiMdnLink">Mozilla Developer Network</a>.</p>
+                <p><strong data-i18n-content="oFpiFirefoxOnly">This control is Firefox-only and is hidden on Chromium.</strong></p>
               </div>
             </div>
             <h2 data-i18n-content="oAppearance">Appearance</h2>
@@ -201,8 +185,8 @@
 
         <div id="about" class="tab-pane">
           <ul>
-            <li><a href="https://github.com/ysard/cookie-quick-manager/" data-i18n-content="oLicense">Source code (Under GPLv3 license)</a></li>
-            <li><a href="https://github.com/ysard/cookie-quick-manager/issues" data-i18n-content="oIssues">Report an issue</a></li>
+            <li><a href="https://github.com/q1/cookie-quick-manager/" data-i18n-content="oLicense">Source code (Under GPLv3 license)</a></li>
+            <li><a href="https://github.com/q1/cookie-quick-manager/issues" data-i18n-content="oIssues">Report an issue</a></li>
             <li><span data-i18n-content="oThanks">Thanks (help and bug reports):</span> Gschanuel, Killogy, Laniakea64, Lejomoz, Machou, Practik, Seanryan-seanryan, bendover22, bughit, AX-Turbo, StanGets, Sane-Max, SpaceClicker, grandemestre, iG8R.</li>
             <li><span data-i18n-content="oTranslations">Translations:</span> Cyanotyp (de), Scheinercc (de).</li>
             <li><span data-i18n-content="oExternalDependencies">External dependencies (GPLv3 compatible):</span>
@@ -212,12 +196,17 @@
                 <li><a href="https://momentjs.com/">Moment.js (MIT)</a> available <a href="https://github.com/moment/moment/">here</a>.</li>
                 <li><a href="https://swisnl.github.io/jQuery-contextMenu/">jQuery contextMenu (MIT)</a> available <a href="https://github.com/swisnl/jQuery-contextMenu">here</a>.</li>
                 <li><a href="https://eonasdan.github.io/bootstrap-datetimepicker/">Bootstrap 3 Datepicker (MIT) </a> available <a href="https://github.com/Eonasdan/bootstrap-datetimepicker">here</a>.</li>
-                <li><a href="https://github.com/jonmiles/bootstrap-treeview">Bootstrap-treeview (Apache-2.0)</a> available <a href="https://github.com/jonmiles/bootstrap-treeview">here</a>.</li>
               </ul>
             </li>
           </ul>
           <div id="changelog">
           <h2>Changelog</h2>
+            <span id="current-version">0.6.0</span>
+            <ul>
+                <li>Dual Chromium/Firefox Manifest V3 builds.</li>
+                <li>Exact cookie identity for protection, partitioning, import, and deletion.</li>
+                <li>Service-worker-safe startup behavior and expanded automated regression coverage.</li>
+            </ul>
             <span>0.5rc2</span>
             <ul>
                 <li>Bring back compatibility with FF 56 #64 #67</li>
@@ -400,7 +389,6 @@
     </div>
     <script src="static/js/jquery-3.4.1.min.js"></script>
     <script src="static/js/bootstrap-3.3.7.min.js"></script>
-    <script src="static/js/bootstrap-treeview-1.2.0.min.js"></script>
     <script src="api.js"></script>
     <script src="options.js"></script>
     <script src="internationalization.js"></script>

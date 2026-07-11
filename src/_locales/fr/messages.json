@@ -405,6 +405,16 @@
     }
   },
 
+  "cookieRestoredExpiredSkipped": {
+    "message": "$number$ cookie(s) expiré(s) ignoré(s).",
+    "description": "Résultat d'importation pour les cookies dont la date d'expiration est déjà passée.",
+    "placeholders": {
+      "number": {
+        "content": "$1"
+      }
+    }
+  },
+
   "cookieRestoredError": {
     "message": "Erreur, aucun cookie n'a été restauré.<br>$json_error$",
     "description": "Alert when a file is imported with an error from the json parser.",
@@ -416,10 +426,10 @@
   },
 
   "cookieRestoredSingleError": {
-    "message": "Erreur, au moins un cookie n'a pas été sauvegardé :<br>$error$<br>Ne vous inquiétez pas; la plupart du temps il s'agit de cookies de session qui ont expiré.",
-    "description": "Alert when a file is imported with an error during the save process.",
+    "message": "$number$ cookie(s) n'ont pas pu être restaurés.",
+    "description": "Import result for cookies that the browser rejected.",
     "placeholders": {
-      "error" : {
+      "number" : {
         "content" : "$1"
       }
     }
@@ -464,7 +474,7 @@
   },
 
   "oPrevent_protected_cookies_deletion": {
-    "message": " Empêcher les sites de supprimer des cookies protégés, même s'ils sont expirés",
+    "message": " Empêcher les sites de supprimer explicitement les cookies protégés",
     "description": "Settings page: Checkbox"
   },
 
@@ -606,6 +616,41 @@
   "oExportAll": {
     "message": "Exporter tous les cookies dans un fichier",
     "description": "Keyboard shortcut description: ctrl+S"
+  },
+
+  "cPartitionKey": {
+    "message": "Clé de partition",
+    "description": "Partition key field in the cookie details panel."
+  },
+
+  "oFpiLabel": {
+    "message": "Isolation par domaine propriétaire",
+    "description": "First-Party Isolation option label."
+  },
+
+  "oFpiAvailability": {
+    "message": "L'isolation par domaine propriétaire est disponible uniquement lorsque l'API de confidentialité de Firefox l'expose.",
+    "description": "First-Party Isolation availability notice."
+  },
+
+  "oFpiDescription": {
+    "message": "La préférence firstPartyIsolate associe les données tierces au domaine affiché dans la barre d'adresse. Elle limite le suivi entre sites, mais peut perturber les connexions via un service tiers.",
+    "description": "Explanation of First-Party Isolation."
+  },
+
+  "oFpiMoreInfo": {
+    "message": "Plus d'informations sur",
+    "description": "Text before the First-Party Isolation documentation link."
+  },
+
+  "oFpiMdnLink": {
+    "message": "Mozilla Developer Network",
+    "description": "First-Party Isolation documentation link text."
+  },
+
+  "oFpiFirefoxOnly": {
+    "message": "Ce réglage est propre à Firefox et reste masqué dans Chromium.",
+    "description": "Browser support notice for First-Party Isolation."
   },
 
 
