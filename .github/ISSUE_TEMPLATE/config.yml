@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/q1/cookie-quick-manager/security/advisories/new
+    about: Use private reporting. Never post vulnerability details or real cookie data in an issue.

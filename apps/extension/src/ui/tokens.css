@@ -1,0 +1,52 @@
+:root {
+  color-scheme: light;
+  --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --canvas: #fff;
+  --sidebar: #fafafa;
+  --surface: #f6f6f7;
+  --ink: #18181b;
+  --secondary-ink: #3f3f46;
+  --muted: #71717a;
+  --border: #e4e4e7;
+  --border-soft: #ededf0;
+  --teal: #087e82;
+  --teal-hover: #066b70;
+  --teal-surface: #edf7f7;
+  --focus: #8abfc1;
+  --hover: #f7f7f8;
+  --badge: #efeff1;
+  --red: #dc2626;
+  --red-border: #fecaca;
+  --red-surface: #fef2f2;
+  --warning-surface: #fffbeb;
+  --warning-border: #fde68a;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #141416;
+  --sidebar: #111113;
+  --surface: #202023;
+  --ink: #f4f4f5;
+  --secondary-ink: #d4d4d8;
+  --muted: #a1a1aa;
+  --border: #303036;
+  --border-soft: #27272b;
+  --teal: #55c3c3;
+  --teal-hover: #79d3d0;
+  --teal-surface: #163132;
+  --focus: #4b9697;
+  --hover: #202023;
+  --badge: #29292e;
+  --red: #f87171;
+  --red-border: #713338;
+  --red-surface: #351c22;
+  --warning-surface: #302b1b;
+  --warning-border: #716035;
+}
+:root[data-theme='dark'] .button.primary {
+  color: #102121;
+}
+:root[data-theme='dark'] .button.danger-solid {
+  color: #281517;
+}

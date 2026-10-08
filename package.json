@@ -1,0 +1,45 @@
+{
+  "name": "cookie-loom",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local-first cookie workbench for Firefox and Chromium.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "npm run dev:demo -w @cookie-loom/extension",
+    "dev:chrome": "npm run dev:chrome -w @cookie-loom/extension",
+    "dev:firefox": "npm run dev:firefox -w @cookie-loom/extension",
+    "build": "npm run build -w @cookie-loom/extension",
+    "zip": "wxt zip apps/extension -b chrome --mv3 && wxt zip apps/extension -b firefox --mv3",
+    "check": "npm run typecheck -w @cookie-loom/extension && tsc -p packages/core/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "lint:firefox": "npm run lint:firefox -w @cookie-loom/extension",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:firefox": "node tests/firefox/run.mjs",
+    "verify:builds": "node scripts/verify-builds.mjs",
+    "prepare:assets": "node scripts/prepare-assets.mjs",
+    "prebuild": "npm run prepare:assets",
+    "prezip": "npm run prepare:assets"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.0",
+    "@types/node": "24.10.1",
+    "prettier": "3.9.9",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  },
+  "overrides": {
+    "web-ext": "10.7.0",
+    "shell-quote": "1.12.0"
+  }
+}

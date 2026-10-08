@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Checks, builds, and packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm audit --omit=dev
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm run lint:firefox
+      - run: npm run zip
+      - run: npm run verify:builds
+      - name: Check archive integrity and generate checksums
+        working-directory: apps/extension/.output
+        run: |
+          for archive in cookie-loom-*.zip; do
+            unzip -tq "$archive"
+          done
+          sha256sum cookie-loom-*.zip > SHA256SUMS
+      - name: Upload unsigned packages and corresponding source
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: cookie-loom-unsigned-packages
+          path: |
+            apps/extension/.output/cookie-loom-*.zip
+            apps/extension/.output/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+  browser-tests:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox
+      - run: xvfb-run --auto-servernum npm run test:e2e
+      - run: npm run test:firefox
+      - name: Upload failed-test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: browser-test-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
