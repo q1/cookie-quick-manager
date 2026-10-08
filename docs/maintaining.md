@@ -54,5 +54,10 @@ Review dependency changes with the lockfile and
 known development-tool advisories still require explicit review and follow-up.
 Do not suppress an audit finding solely to make the status green.
 
+CodeRabbit inherits the existing organization settings and excludes the archived
+`legacy/` tree from automated review. Maintained code and documentation stay in
+scope. Service capacity limits can still skip its review; the required CI checks
+and maintainer review remain necessary.
+
 Use [the release guide](releasing.md) to promote reviewed artifacts. Signing,
 GitHub releases, and store publication remain deliberate maintainer actions.
