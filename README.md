@@ -1,112 +1,142 @@
-# Overview
+# Cookie Loom
 
-Cookie Quick Manager: A complete manager for cookies accumulated during browsing.
-It allows you to view, edit, create, delete, backup, restore cookies and search them by domain names. Contextual Identities such as Private Browsing, First-Party Isolation, and SameSite flag are also supported.
-In addition, the LocalStorage of the page viewed can be deleted (see below).
+**Your cookies, untangled.** A private cookie manager for everyday browsing
+and developer work, with a quick site popup and a full cookie workbench.
 
-Cookie Quick Manager is designed for developers, testers or people
-concerned about their privacy on the Internet.
+Cookie Loom is an independent, substantial rewrite of
+[Cookie Quick Manager](https://github.com/ysard/cookie-quick-manager), with a
+new TypeScript / React codebase and shared Chromium and Firefox builds. It
+continues under GPL-3.0-or-later and retains the original project's history and
+attribution. See [NOTICE](NOTICE) and [the migration guide](docs/migration.md).
 
-This WebExtension is compatible with Firefox 57 and is inspired by addons like [Cookies Manager+](https://addons.mozilla.org/fr/firefox/addon/cookies-manager-plus/) and [Advanced Cookie Manager](https://addons.mozilla.org/fr/firefox/addon/cookie-manager/) whose development has been discontinued due to the withdrawal of the support for "Legacy" extensions.
+**Status: 0.1.0 development preview.** Build and load it locally using the
+instructions below. No Cookie Loom browser-store release is claimed here.
+Targets are desktop Chromium 132+ and Firefox 140+; browser-specific behavior
+must be verified on the versions you use. Safari and mobile are not current
+release targets.
 
-**November 2018: Cookie Quick Manager is now available on Android!**
+![Cookie Loom workbench with synthetic cookies](docs/design/workbench.png)
 
-<p align="center">
-<img  src="https://raw.githubusercontent.com/ysard/cookie-quick-manager/fpi/AMO/screenshots/github.png">
-</p>
+## A small popup. A capable workbench.
 
+- **Current-site controls:** inspect the current site's cookies, protect what
+  you want to keep, and clear the rest with an explicit confirmation.
+- **Full workbench:** search and filter cookies, inspect values and attributes,
+  and create, edit, or delete individual records. Values start masked, with
+  reveal and copy controls close at hand.
+- **Context-aware operations:** keep stores, Firefox containers, first-party
+  domains, and supported partition keys distinct. Copy selected cookies into
+  another store only after confirming the destination.
+- **Developer value tools:** URL and UTF-8 Base64 conversion edits a draft
+  before you save it.
+- **Safer cleanup:** protected identities are skipped; available undo is
+  limited to five minutes in the open workbench tab. Automatic startup cleanup
+  is opt-in.
+- **Local transfers:** preview native JSON, legacy JSON, or Netscape imports;
+  export selected data deliberately. Native JSON retains the richest metadata.
+- **A quieter interface:** restrained teal, system/light/dark themes, readable
+  controls, compact layouts, and keyboard shortcuts for search and help.
 
-# Features
+Edits stay in a draft until saved. Cookie Loom warns before discarding changes
+and lets you reload a cookie that changed in the browser.
 
-* User friendly: Clear and structured user interface. Each parameter and functionality is described when the mouse is over the element.
-* Windowed and tab mode: Choose the opening in a tab to get a wider view.
-* Transparency and security: The source code is free (under GPLv3) and # published on a public platform, the only way to allow reviews and external contributions.
-* Search: A user can search for cookies of a domain and subdomains which depend on it.
-* Edit/Create: All the attributes of a cookie can be modified: domain, path, name, value, expiration date, as well as secure and httponly flags.
-* Delete: Remove the cookies of the current website in two clicks.
-* Export: The export and import of a cookie or cookies from a domain in JSON or Netscape format is just as easy.
-* First-Party Isolation: Supported with some limitations (due to API bugs) on Firefox 59, 60, and 61, and without limitations on Firefox 62 (scheduled on September 2018).
-* Contexts: Contexts (also called Multi-Account Containers, or Contextual Identities) are supported. A user can search and display cookies inside a container, or copy cookies from a container to another, or save a cookie in a specific context.
-* SameSite: The SameSite flag is supported. This is a partial protection against the risks associated with Cross-Site Request Forgery (CSRF) and Cross-Site Script Inclusion (XSSI) attacks, implemented since Firefox 63.
-* Cookie protection: Delete cookies except protected ones, with two clicks at anytime from the website you are viewing. An option can also prevent cookies from being deleted by the sites themselves.
-* Protection of session cookies: Session cookies can be protected in two clicks to prevent accidental logout from websites after cleaning normal cookies.
-* Cleaning and privacy: Can automatically delete all cookies at startup.
-* LocalStorage: Keys/values of the page viewed can be deleted.
+Protection only affects Cookie Loom cleanup. It cannot stop websites, cookie
+expiry, other extensions, or browser settings from deleting cookies. Undo is
+best effort, not a backup. Cookie exports may contain usable login credentials.
 
+## Privacy by default
 
-# Privacy
+There is no account, telemetry, cloud service, remote application code, or
+background upload. Preferences and protected identities stay in local
+extension storage. Cookie values remain in the browser, temporary working
+memory, or a file/clipboard export you explicitly request.
 
-This addon does not store or leak any personal information.
+The extension asks you to grant HTTP/HTTPS website access before it can manage
+cookies. This is an explicit **all-websites grant**, including when opening
+the current-site popup; a per-site permission mode is not yet implemented.
+The Firefox build also declares container access. You can revoke website access
+in your browser's extension settings. Optional scripting access is requested
+only for confirmed local storage cleanup on the active page.
 
-It requires the following permissions to operate:
+Read the [privacy policy](PRIVACY.md) and [security policy](SECURITY.md) before
+using sensitive browser sessions. The [usage guide](docs/usage.md) explains
+search syntax, cleanup scope, and import behavior.
 
-* Host permission for all urls: This allows you to edit the cookies and to delete the Localstorage of any site visited.
-* Cookies: Allows access to the browser's cookie store.
-* ActiveTab: Allows access to the currently consulted url, and its favicon if it exists.
-* Storage: Allows the storage of the following user settings:
-    - size of the windowed mode,
-    - protected cookies (only the name of the domains),
-    - the template used to import/export the cookies,
-    - the skin.
-* Browsing data: Enables extensions to clear the data that is accumulated while the user is browsing (LocalStorage here).
-* Contextual Identities: Allows the addon to list the containers.
-* Privacy: Access and modify various privacy-related browser settings (the FirstPartyIsolation flag here).
-* ClipboardWrite (optional): Allows the export of cookies to the clipboard from Firefox 63.
+## Try the demo
 
+Use Node.js 24 and npm:
 
-# About cookie protection
+```sh
+npm ci
+npm run dev
+```
 
-The protection of cookies is limited to the current addon actions, to the deletions that can be made by the sites themselves, or to the deletions made in the browser's "Cookies and Site Data" options.
-This means that if you choose the browser option to delete all cookies when it closes, the addon will be unable to restore them (the method used by the browser does not send the necessary signal to notify the addon). However, a similar option is reimplemented in the addon itself in order to keep only the protected cookies when restarting the browser.
+Open the local URL printed by Vite, normally `http://localhost:5173`.
+The demo uses synthetic cookies and never accesses your actual browser cookie
+store. It is useful for exploring the interface, not verifying extension APIs.
 
+## Build the extension
 
-# What is "Delete Current Site Local Storage" on the popup menu?
+```sh
+npm run build
+```
 
-This item allows a user to delete LocalStorage keys from the viewed page.
+**Chromium:** open `chrome://extensions`, enable **Developer mode**, select
+**Load unpacked**, and choose `apps/extension/.output/chrome-mv3`.
 
-The LocalStorage is a quite new feature of HTML5 that allows developers to create data in your browser using JavaScript. Cookies are just one type of storage among others.
-You will also find the term "SessionStorage", a LocalStorage where data is stored temporarily (deleted on browser restart), but the important thing is that LocalStorage is persistent, and cleared only at the discretion of the visited websites.
-You may erase all of the LocalStorage store by following the procedure described in the [documentation of Firefox](https://support.mozilla.org/en-US/kb/delete-cookies-remove-info-websites-stored#w_delete-all-cookies), and by selecting "Offline Website Data".
+**Firefox:** open `about:debugging#/runtime/this-firefox`, select **Load Temporary
+Add-on**, and choose `apps/extension/.output/firefox-mv3/manifest.json`.
+This is a temporary development installation; normal distribution requires
+[Mozilla signing](https://extensionworkshop.com/documentation/publish/signing-and-distribution-overview/).
 
-From the point of view of privacy and security:
+Use a disposable browser profile for development. To run WXT's development
+workflow directly, use `npm run dev:chrome` or `npm run dev:firefox`.
 
-This kind of persistant data (even after clearing cache), was invented to store small data allowing the operation of online applications, but also offers new and better accurate ways of tracking thanks to the memorization of private or identifying data.
+## Develop and contribute
 
+```sh
+npm run format:check
+npm audit --omit=dev
+npm run check
+npm test
+npm run build
+npm run lint:firefox
+npx playwright install chromium firefox
+npm run test:e2e
+npm run test:firefox
+```
 
-# Support & source code
+The npm workspace contains:
 
-The extension is still in development with the launch of Firefox Quantum; questions, bug reports and feature requests are open on the [GitHub repository](https://github.com/ysard/cookie-quick-manager/issues).
+```text
+apps/extension/   WXT extension, React interface, browser adapter, local demo
+packages/core/    Cookie identity, validation, filters, import/export rules
+docs/            Architecture, development, migration, verification, releases
+legacy/          Original extension and historical documentation/assets
+```
 
+Start with [CONTRIBUTING.md](CONTRIBUTING.md),
+[development instructions](docs/development.md), and
+[architecture decisions](docs/architecture.md). See
+[browser verification](docs/verification.md) for real-extension checks and
+[the release guide](docs/releasing.md) for packaging and store preparation.
+`npm run zip` creates unsigned browser-specific archives for review.
 
-# How to contribute ?
+See the [dependency review](docs/dependency-review.md) for the remaining
+development-tool advisories; the production dependency audit is clean.
 
-1. You can contribute by reporting bugs or problems encountered by creating an issue on [this page] (https://github.com/ysard/cookie-quick-manager/issues)
+Report bugs and ideas in [this repository's issues](https://github.com/q1/cookie-quick-manager/issues).
+Use synthetic data and redact cookie values. Report vulnerabilities through
+[private vulnerability reporting](https://github.com/q1/cookie-quick-manager/security/advisories/new),
+following [SECURITY.md](SECURITY.md).
 
+## Origins and license
 
-2. You can translate the application into your language.
-The files are at this address:
-https://github.com/ysard/cookie-quick-manager/tree/fpi/src/_locales
+Cookie Quick Manager was created by Ysard and contributors. Cookie Loom is an
+independent continuation with a new name, interface, architecture, and release
+identity; it is not an upstream-endorsed update. The original source and notices
+are preserved in `legacy/`, which is excluded from the new builds.
 
-You must fork the repository and then make a pull-request with your changes.
-See this documentation with illustrations:
-
-- https://help.github.com/en/articles/fork-a-repo
-- https://help.github.com/en/articles/creating-a-pull-request-from-a-fork
-
-Then execute the following commands:
-
-    cd cookie-quick-manager
-    make get_missing_from_new_language LOCALE = "from"
-
-(here, `de` is the locale code for Deutch language)
-
-The previous command will create a file in `src/_locales/<your_locale>/messages.json`,
-then display the list of elements to be translated.
-The file does not need to be translated to 100% to be used!
-
-You must then make your pull request on github.
-
-
-# License
-
-[GPLv3](https://github.com/ysard/cookie-quick-manager/blob/master/LICENSE").
+Licensed under [GNU GPL version 3 or later](LICENSE). Original copyright:
+2017–2019 Ysard. New work: 2026 Cookie Loom contributors. See [NOTICE](NOTICE)
+for lineage and third-party attribution.

@@ -1,0 +1,6 @@
+# Preserve repository/organization review settings and focus on maintained code.
+inheritance: true
+reviews:
+  path_filters:
+    # Archived upstream sources are retained for provenance, not shipped or maintained.
+    - '!legacy/**'

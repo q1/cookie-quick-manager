@@ -1,0 +1,20 @@
+Cookie Loom
+Copyright (C) 2026 Cookie Loom contributors
+
+Cookie Loom is an independent continuation and substantial rewrite of
+Cookie Quick Manager, originally developed by Ysard and contributors.
+Original project: https://github.com/ysard/cookie-quick-manager
+Fork repository: https://github.com/q1/cookie-quick-manager
+Historical baseline: ef7d9e4d9f95049c7c9c442990190b21dc9c703b
+
+The original source carries Copyright (C) 2017-2019 Ysard and is licensed
+under the GNU General Public License, version 3 or (at your option) any
+later version. Cookie Loom continues under GPL-3.0-or-later. See LICENSE.
+
+The legacy/ directory preserves the original extension and its notices
+for historical reference. It is not included in Cookie Loom's extension
+builds. Third-party files in that archive retain their original licenses.
+New dependencies retain their respective licenses; see their packages.
+
+Cookie Loom is a separate project with a separate product identity.
+No endorsement by the original authors, Mozilla, or Google is implied.

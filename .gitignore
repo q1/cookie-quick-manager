@@ -1,3 +1,14 @@
 dist/
 build/
 poc/
+node_modules/
+.wxt/
+.output/
+coverage/
+playwright-report/
+test-results/
+*.log
+.env
+.env.*
+!.env.example
+tmp/

@@ -1,0 +1,31 @@
+{
+  "name": "@cookie-loom/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "dev:demo": "vite --config vite.demo.config.ts --host 127.0.0.1",
+    "dev:chrome": "wxt -b chrome --mv3",
+    "dev:firefox": "wxt -b firefox --mv3",
+    "build": "wxt build -b chrome --mv3 && wxt build -b firefox --mv3",
+    "zip": "npm --prefix ../.. run zip",
+    "typecheck": "wxt prepare && tsc --noEmit",
+    "lint:firefox": "node ../../scripts/lint-firefox.mjs"
+  },
+  "dependencies": {
+    "@cookie-loom/core": "*",
+    "lucide-react": "0.468.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.2.0",
+    "@wxt-dev/module-react": "1.2.2",
+    "vite": "8.3.4",
+    "web-ext": "10.7.0",
+    "wxt": "0.21.4"
+  }
+}

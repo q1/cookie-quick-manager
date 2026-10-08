@@ -1,0 +1,52 @@
+name: Bug report
+description: Report a reproducible problem using synthetic data.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not post real cookie values, session tokens, exports, or private screenshots.
+        Report vulnerabilities privately using SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Cookie Loom version or commit
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser, version, and operating system
+      placeholder: Firefox 144 on Linux; normal profile, no containers
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where does it happen?
+      options:
+        - Installed extension popup
+        - Installed extension workbench
+        - Local demo workspace
+        - Build or test tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include permission state and relevant store/partition details. Use synthetic values.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Optional errors or screenshots with private data removed.
