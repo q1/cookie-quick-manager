@@ -45,6 +45,8 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: cookie-loom-unsigned-packages
+          # WXT writes these verified archives beneath the hidden .output directory.
+          include-hidden-files: true
           path: |
             apps/extension/.output/cookie-loom-*.zip
             apps/extension/.output/SHA256SUMS
