@@ -3,6 +3,7 @@ import { createGateway, type BrowserApi } from '../../apps/extension/src/lib/gat
 
 declare const __FIREFOX_REPORT_URL__: string;
 declare const browser: BrowserApi & {
+  tabs: BrowserApi['tabs'] & { remove(id: number): Promise<void> };
   runtime: BrowserApi['runtime'] & {
     getBrowserInfo(): Promise<{ name: string; version: string }>;
     reload(): void;
@@ -111,6 +112,42 @@ void (async () => {
       'Default Firefox store not found.',
     );
   });
+  await check('extension page mutations reach the production background coordinator', async () => {
+    const resultKey = 'cookieLoomNativeCoordinatorResult';
+    const run = String(Date.now());
+    let stop = () => {};
+    const completed = new Promise<{ success: boolean; error?: string }>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        stop();
+        reject(new Error('The extension page did not receive a coordinator response.'));
+      }, 15_000);
+      const changed = (
+        changes: Record<string, { newValue?: { run?: string; success: boolean; error?: string } }>,
+        area: string,
+      ) => {
+        const result = changes[resultKey]?.newValue;
+        if (area === 'local' && result?.run === run) {
+          stop();
+          resolve(result);
+        }
+      };
+      stop = () => {
+        clearTimeout(timeout);
+        browser.storage.onChanged.removeListener(changed);
+      };
+      browser.storage.onChanged.addListener(changed);
+    });
+    const tab = (await browser.tabs.create({
+      url: `${browser.runtime.getURL('/workbench.html')}?nativeRun=${run}`,
+    })) as { id?: number };
+    try {
+      const result = await completed;
+      assert(result.success, result.error ?? 'Production coordinator request failed.');
+    } finally {
+      stop();
+      if (tab.id !== undefined) await browser.tabs.remove(tab.id);
+    }
+  });
   let base = await gateway.saveCookie(seed());
   await check('native create and edit retain cookie attributes', async () => {
     assert(
@@ -151,6 +188,46 @@ void (async () => {
       'Host-only and domain identities collapsed.',
     );
   });
+  await check(
+    'editing coexisting host-only and domain cookies preserves both identities',
+    async () => {
+      const name = 'loom_scope_edit';
+      await gateway.saveCookie(seed({ name, domain: '.app.localhost', hostOnly: false }));
+      await gateway.saveCookie(seed({ name, value: 'host-original' }));
+      const initial = (await gateway.listCookies()).filter((cookie) => cookie.name === name);
+      const domain = initial.find((cookie) => !cookie.hostOnly);
+      const host = initial.find((cookie) => cookie.hostOnly);
+      assert(domain && host, 'Both cookie scopes must exist before the edit.');
+      const savedDomain = await gateway.saveCookie({ ...domain, value: 'domain-edited' }, domain);
+      assert(
+        cookieKey(savedDomain) === cookieKey(domain),
+        'Domain edit returned another identity.',
+      );
+      let savedHost: CookieRecord | undefined;
+      let editError: string | undefined;
+      try {
+        savedHost = await gateway.saveCookie({ ...host, value: 'host-edited' }, host);
+      } catch (error) {
+        editError = error instanceof Error ? error.message : String(error);
+      }
+      const current = (await gateway.listCookies()).filter((cookie) => cookie.name === name);
+      assert(
+        current.length === 2,
+        `Editing the host cookie removed its domain sibling. ${editError ?? ''}`,
+      );
+      assert(!editError, `Host-only edit failed: ${editError}`);
+      assert(
+        savedHost && cookieKey(savedHost) === cookieKey(host),
+        'Host-only edit returned another identity.',
+      );
+      assert(
+        current.find((cookie) => cookieKey(cookie) === cookieKey(host))?.value === 'host-edited' &&
+          current.find((cookie) => cookieKey(cookie) === cookieKey(domain))?.value ===
+            'domain-edited',
+        'Editing one cookie changed its coexisting sibling.',
+      );
+    },
+  );
   await check('native exact-path deletion leaves same-name sibling intact', async () => {
     const root = await gateway.saveCookie(seed({ name: 'loom_path' }));
     const nested = await gateway.saveCookie(seed({ name: 'loom_path', path: '/account' }));

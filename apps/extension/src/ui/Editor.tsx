@@ -38,6 +38,8 @@ export function CookieEditor({
   onSaved,
   onDelete,
   onDirtyChange,
+  onSavingChange,
+  missing = false,
 }: {
   original?: CookieRecord;
   seed: CookieRecord;
@@ -45,6 +47,8 @@ export function CookieEditor({
   onSaved: (cookie: CookieRecord) => void;
   onDelete: (cookies: CookieRecord[]) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onSavingChange?: (saving: boolean) => void;
+  missing?: boolean;
 }) {
   const { gateway, stores, preferences, protect, notify } = useWorkspace();
   // A live refresh must not replace the version this draft was based on.
@@ -64,7 +68,10 @@ export function CookieEditor({
   const fieldPrefix = useId();
   const dirty = fingerprint(draft) !== fingerprint(baselineDraft);
   const changedInBrowser =
-    !!baselineOriginal && !!original && fingerprint(original) !== fingerprint(baselineOriginal);
+    !missing &&
+    !!baselineOriginal &&
+    !!original &&
+    fingerprint(original) !== fingerprint(baselineOriginal);
   const protectedCookie = preferences.protectedKeys.includes(cookieKey(baselineOriginal ?? draft));
   const dateValue = localDateValue(draft.expirationDate);
   const issues = validateCookie(draft);
@@ -85,6 +92,7 @@ export function CookieEditor({
     onDirtyChange?.(dirty);
     return () => onDirtyChange?.(false);
   }, [dirty, onDirtyChange]);
+  useEffect(() => () => onSavingChange?.(false), [onSavingChange]);
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1180px)');
     const change = () => setCompact(media.matches);
@@ -142,6 +150,7 @@ export function CookieEditor({
   function fieldAttributes(field: string) {
     const invalid = issues.some((issue) => issue.field === field && issue.severity === 'error');
     return {
+      disabled: saving,
       'aria-invalid': invalid,
       'aria-describedby': invalid ? `${fieldPrefix}-${field}-error` : undefined,
     };
@@ -157,12 +166,17 @@ export function CookieEditor({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (submitting.current) return;
+    if (missing) {
+      setError('This cookie no longer exists. Close the editor to create a new cookie.');
+      return;
+    }
     if (issues.some((issue) => issue.severity === 'error')) {
       setError('Resolve the highlighted fields before saving.');
       return;
     }
     submitting.current = true;
     setSaving(true);
+    onSavingChange?.(true);
     setError('');
     try {
       const saved = await gateway.saveCookie(draft, baselineOriginal);
@@ -177,10 +191,11 @@ export function CookieEditor({
     } finally {
       submitting.current = false;
       setSaving(false);
+      onSavingChange?.(false);
     }
   }
   function reload() {
-    if (!original) return;
+    if (!original || missing) return;
     const current = structuredClone(original);
     setDraft(current);
     setBaselineDraft(current);
@@ -203,7 +218,13 @@ export function CookieEditor({
           <X size={18} />
         </IconButton>
       </div>
-      <form onSubmit={(event) => void submit(event)} noValidate>
+      <form onSubmit={(event) => void submit(event)} noValidate aria-busy={saving}>
+        {missing && (
+          <div className="notice warning editor-stale" role="status">
+            This cookie no longer exists in the browser. Your draft is kept here; close the editor
+            to choose or create another cookie.
+          </div>
+        )}
         {changedInBrowser && (
           <div className="notice warning editor-stale" role="status">
             <span>This cookie changed in the browser.</span>
@@ -417,7 +438,12 @@ export function CookieEditor({
           )}
           {fieldError('firstPartyDomain')}
         </details>
-        <ValueTools value={draft.value} onChange={(value) => patch({ value })} />
+        <fieldset
+          disabled={saving}
+          style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'contents' }}
+        >
+          <ValueTools value={draft.value} onChange={(value) => patch({ value })} />
+        </fieldset>
         {baselineOriginal && (
           <div className="protection-setting">
             <label className="toggle-label">
@@ -425,6 +451,7 @@ export function CookieEditor({
                 className="switch"
                 type="checkbox"
                 checked={protectedCookie}
+                disabled={missing || saving}
                 onChange={(event) => {
                   void protect([baselineOriginal], event.target.checked).catch(() =>
                     notify('Could not update protection.'),
@@ -455,7 +482,7 @@ export function CookieEditor({
                   onDelete([baselineOriginal]);
                 })
               }
-              disabled={protectedCookie || saving}
+              disabled={protectedCookie || saving || missing}
               title={
                 protectedCookie ? 'Turn off protection to delete this cookie.' : 'Delete cookie'
               }
@@ -466,7 +493,7 @@ export function CookieEditor({
           <button
             className="button primary"
             type="submit"
-            disabled={saving || (!!baselineOriginal && !dirty)}
+            disabled={saving || missing || (!!baselineOriginal && !dirty)}
           >
             {saving ? 'Saving…' : baselineOriginal ? 'Save changes' : 'Create cookie'}
           </button>

@@ -83,25 +83,35 @@ try {
   );
   manifest.background.scripts.push('native-firefox-fixture.js');
   await writeFile(join(source, 'manifest.json'), JSON.stringify(manifest));
-  await build({
-    configFile: false,
-    root,
-    logLevel: 'error',
-    define: { __FIREFOX_REPORT_URL__: JSON.stringify(reportUrl) },
-    resolve: { alias: { '@cookie-loom/core': join(root, 'packages/core/src/index.ts') } },
-    build: {
-      target: 'firefox140',
-      outDir: source,
-      emptyOutDir: false,
-      minify: false,
-      lib: {
-        entry: join(root, 'tests/firefox/fixture.ts'),
-        formats: ['iife'],
-        name: 'CookieLoomNativeFixture',
-        fileName: () => 'native-firefox-fixture.js',
+  for (const [entry, name, file] of [
+    ['fixture.ts', 'CookieLoomNativeFixture', 'native-firefox-fixture.js'],
+    ['client.ts', 'CookieLoomNativeClient', 'native-firefox-client.js'],
+  ])
+    await build({
+      configFile: false,
+      root,
+      logLevel: 'error',
+      define: { __FIREFOX_REPORT_URL__: JSON.stringify(reportUrl) },
+      resolve: { alias: { '@cookie-loom/core': join(root, 'packages/core/src/index.ts') } },
+      build: {
+        target: 'firefox140',
+        outDir: source,
+        emptyOutDir: false,
+        minify: false,
+        lib: {
+          entry: join(root, 'tests/firefox', entry),
+          formats: ['iife'],
+          name,
+          fileName: () => file,
+        },
       },
-    },
-  });
+    });
+  // Only the copied page is replaced. Its allowed production URL exercises the
+  // actual background coordinator's sender validation and message response path.
+  await writeFile(
+    join(source, 'workbench.html'),
+    '<!doctype html><html><head><meta charset="utf-8"><title>Cookie Loom native client</title></head><body><script src="native-firefox-client.js"></script></body></html>',
+  );
   const binary = await firefoxBinary();
   child = spawn(
     process.execPath,

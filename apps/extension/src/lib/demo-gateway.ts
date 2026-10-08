@@ -140,6 +140,16 @@ export function createDemoGateway(): Gateway {
       emit();
       return clone(preferences);
     },
+    async setProtection(items, value) {
+      const keys = new Set(preferences.protectedKeys);
+      for (const cookie of items) {
+        if (value) keys.add(cookieKey(cookie));
+        else keys.delete(cookieKey(cookie));
+      }
+      preferences = { ...preferences, protectedKeys: [...keys] };
+      emit();
+      return clone(preferences);
+    },
     subscribe(listener) {
       listeners.add(listener);
       return () => {

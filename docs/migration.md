@@ -12,6 +12,9 @@ does not transfer the old extension's settings or protected-cookie list.
    Manager. Treat that file as sensitive: it may contain login credentials.
 3. Open Cookie Loom's import preview and inspect the records and any errors.
    JSON is preferred to Netscape format because it can retain more metadata.
+   For old Cookie Quick Manager Netscape text exports, enable the explicit
+   compatibility option before reviewing; standard text imports use different
+   domain-scope flag semantics.
 4. Apply only the intended records to the intended browser store. Imports can
    partially fail because browsers enforce cookie and permission rules.
    Saved stores are preserved by default. If moving to a different profile,

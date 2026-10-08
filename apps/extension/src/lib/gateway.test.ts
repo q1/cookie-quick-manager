@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { cookieDomain, cookieKey, domainMatches, type CookieRecord } from '@cookie-loom/core';
 import { createGateway, registerBackground, type BrowserApi } from './gateway';
 import { HOST_PERMISSIONS } from './types';
+import {
+  registerMutationCoordinator,
+  withRemoteMutations,
+  type MutationRuntime,
+} from './mutation-coordinator';
 
 class Event {
   listeners = new Set<(...args: any[]) => any>();
@@ -171,7 +176,9 @@ function fixture(initial: CookieRecord[] = [], firefox = false) {
           },
         }
       : {}),
-    scripting: { executeScript: vi.fn(async () => []) },
+    scripting: {
+      executeScript: vi.fn(async () => [{ frameId: 0, result: { cleared: true } }]),
+    },
   };
   return {
     api,
@@ -184,6 +191,43 @@ function fixture(initial: CookieRecord[] = [], firefox = false) {
       hostAccess = false;
     },
   };
+}
+
+function coordinated(f: ReturnType<typeof fixture>) {
+  let listener: Parameters<MutationRuntime['onMessage']['addListener']>[0] | undefined;
+  const coordinator = registerMutationCoordinator(
+    {
+      id: 'test',
+      getURL: (path) => `chrome-extension://test${path}`,
+      onMessage: {
+        addListener: (value) => {
+          listener = value;
+        },
+        removeListener: () => {
+          listener = undefined;
+        },
+      },
+    },
+    f.gateway,
+  );
+  const client = () =>
+    withRemoteMutations(
+      f.gateway,
+      (message) =>
+        new Promise((resolve, reject) => {
+          const handled = listener!(
+            message,
+            {
+              id: 'test',
+              url: 'chrome-extension://test/workbench.html',
+            },
+            resolve,
+          );
+          if (handled !== true)
+            reject(new Error('The mutation listener did not claim the channel.'));
+        }),
+    );
+  return { ...coordinator, client };
 }
 
 describe('browser gateway', () => {
@@ -346,6 +390,67 @@ describe('browser gateway', () => {
     expect(f.api.cookies.remove).not.toHaveBeenCalled();
   });
 
+  it('resolves Firefox writes independently when set returns an older domain sibling', async () => {
+    const domain = cookie({ domain: '.example.com', hostOnly: false, storeId: 'firefox-default' });
+    const host = cookie({ storeId: 'firefox-default', value: 'host-old' });
+    const f = fixture([domain, host], true);
+    const nativeSet = vi.mocked(f.api.cookies.set).getMockImplementation()!;
+    vi.mocked(f.api.cookies.set).mockImplementation(async (details) => {
+      await nativeSet(details);
+      return { ...domain, firstPartyDomain: '' };
+    });
+    const saved = await f.gateway.saveCookie({ ...host, value: 'host-new' }, host);
+    expect(saved).toMatchObject({ hostOnly: true, value: 'host-new' });
+    expect(f.cookies()).toContainEqual({ ...domain, firstPartyDomain: '' });
+    expect(f.api.cookies.remove).not.toHaveBeenCalled();
+  });
+
+  it('returns a newly created host cookie instead of the sibling returned by Firefox set', async () => {
+    const domain = cookie({ domain: '.example.com', hostOnly: false, storeId: 'firefox-default' });
+    const f = fixture([domain], true);
+    const nativeSet = vi.mocked(f.api.cookies.set).getMockImplementation()!;
+    vi.mocked(f.api.cookies.set).mockImplementation(async (details) => {
+      await nativeSet(details);
+      return { ...domain, firstPartyDomain: '' };
+    });
+    const saved = await f.gateway.saveCookie(
+      cookie({ storeId: 'firefox-default', value: 'new-host' }),
+    );
+    expect(saved).toMatchObject({ hostOnly: true, value: 'new-host' });
+    expect(f.cookies()).toHaveLength(2);
+    expect(f.api.cookies.remove).not.toHaveBeenCalled();
+  });
+
+  it('reports an unverifiable write without deleting an unverified cookie', async () => {
+    const f = fixture();
+    vi.mocked(f.api.cookies.getAll).mockResolvedValue([]);
+    await expect(f.gateway.saveCookie(cookie())).rejects.toThrow('write could not be verified');
+    expect(f.cookies()).toHaveLength(1);
+    expect(f.api.cookies.remove).not.toHaveBeenCalled();
+  });
+
+  it('does not accept a null set result for an attribute-only edit', async () => {
+    const original = cookie();
+    const f = fixture([original]);
+    vi.mocked(f.api.cookies.set).mockResolvedValue(null);
+    await expect(f.gateway.saveCookie({ ...original, secure: false }, original)).rejects.toThrow(
+      'The browser rejected this cookie',
+    );
+    expect(f.cookies()).toEqual([original]);
+    expect(f.api.cookies.remove).not.toHaveBeenCalled();
+  });
+
+  it('verifies semantic attributes after set rather than only the unchanged value', async () => {
+    const original = cookie();
+    const f = fixture([original]);
+    vi.mocked(f.api.cookies.set).mockResolvedValue(original);
+    await expect(f.gateway.saveCookie({ ...original, httpOnly: false }, original)).rejects.toThrow(
+      'write could not be verified',
+    );
+    expect(f.cookies()).toEqual([original]);
+    expect(f.api.cookies.remove).not.toHaveBeenCalled();
+  });
+
   it('rolls back a rename if the original can no longer be removed safely', async () => {
     const original = cookie();
     const f = fixture([original]);
@@ -462,14 +567,45 @@ describe('browser gateway', () => {
     vi.stubGlobal('location', { origin: 'https://navigated.example' });
     vi.stubGlobal('localStorage', { clear });
     try {
-      expect(() => details.func(details.args[0])).toThrow('The tab navigated');
+      expect(details.func(details.args[0])).toEqual({ cleared: false });
       expect(clear).not.toHaveBeenCalled();
       vi.stubGlobal('location', { origin: 'https://example.com' });
-      details.func(details.args[0]);
+      expect(details.func(details.args[0])).toEqual({ cleared: true });
       expect(clear).toHaveBeenCalledOnce();
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('does not acknowledge a local-storage SecurityError inside the injected function', async () => {
+    const f = fixture();
+    await f.gateway.clearCurrentTabLocalStorage();
+    const details = vi.mocked(f.api.scripting!.executeScript).mock.calls[0]![0];
+    vi.stubGlobal('location', { origin: 'https://example.com' });
+    vi.stubGlobal('localStorage', {
+      clear: () => {
+        throw new DOMException('Storage access denied', 'SecurityError');
+      },
+    });
+    try {
+      expect(details.func(details.args[0])).toEqual({ cleared: false });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each([
+    ['a resolved Firefox script error', [{ frameId: 0, error: { message: 'Script failed' } }]],
+    ['an empty response', []],
+    ['a missing acknowledgement', [{ frameId: 0 }]],
+    ['a negative acknowledgement', [{ frameId: 0, result: { cleared: false } }]],
+    ['an acknowledgement from another frame', [{ frameId: 1, result: { cleared: true } }]],
+  ])('does not report local storage cleared for %s', async (_name, results) => {
+    const f = fixture();
+    vi.mocked(f.api.scripting!.executeScript).mockResolvedValue(results);
+    await expect(f.gateway.clearCurrentTabLocalStorage()).rejects.toThrow(
+      'local storage could not be cleared',
+    );
   });
 
   it('resolves a Chromium private tab to its actual cookie store', async () => {
@@ -545,6 +681,82 @@ describe('browser gateway', () => {
     unsubscribe();
     await f.changed.fire({});
     expect(listener).toHaveBeenCalledOnce();
+  });
+});
+
+describe('shared production mutation queue', () => {
+  it('rejects the stale second save from concurrent extension pages', async () => {
+    const original = cookie();
+    const f = fixture([original]);
+    const coordinator = coordinated(f);
+    const first = coordinator.client(),
+      second = coordinator.client();
+    const results = await Promise.allSettled([
+      first.saveCookie({ ...original, value: 'first-edit' }, original),
+      second.saveCookie({ ...original, value: 'second-edit' }, original),
+    ]);
+    expect(results[0]?.status).toBe('fulfilled');
+    expect(results[1]).toMatchObject({
+      status: 'rejected',
+      reason: expect.objectContaining({
+        message: expect.stringContaining('changed in the browser'),
+      }),
+    });
+    expect(f.cookies()[0]?.value).toBe('first-edit');
+    coordinator.dispose();
+  });
+
+  it('merges simultaneous theme and protection updates from separate pages', async () => {
+    const f = fixture();
+    const coordinator = coordinated(f);
+    await Promise.all([
+      coordinator.client().setProtection([cookie()], true),
+      coordinator.client().updatePreferences({ theme: 'dark' }),
+    ]);
+    expect(await f.gateway.getPreferences()).toMatchObject({
+      theme: 'dark',
+      protectedKeys: [cookieKey(cookie())],
+    });
+    coordinator.dispose();
+  });
+
+  it('retains two simultaneous protection additions', async () => {
+    const f = fixture();
+    const coordinator = coordinated(f);
+    const first = cookie(),
+      second = cookie({ name: 'second' });
+    await Promise.all([
+      coordinator.client().setProtection([first], true),
+      coordinator.client().setProtection([second], true),
+    ]);
+    expect((await f.gateway.getPreferences()).protectedKeys).toEqual([
+      cookieKey(first),
+      cookieKey(second),
+    ]);
+    coordinator.dispose();
+  });
+
+  it('queues startup cleanup after already queued protection updates', async () => {
+    const original = cookie();
+    const f = fixture([original]);
+    await f.gateway.updatePreferences({ cleanOnStartup: true });
+    const coordinator = coordinated(f);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const updating = coordinator.enqueue(async () => {
+      await gate;
+      await f.gateway.setProtection([original], true);
+    });
+    registerBackground(f.api, f.gateway, coordinator.enqueue);
+    const starting = f.startup.fire();
+    await Promise.resolve();
+    expect(f.api.cookies.remove).not.toHaveBeenCalled();
+    release();
+    await Promise.all([updating, starting]);
+    expect(f.cookies()).toEqual([original]);
+    coordinator.dispose();
   });
 });
 

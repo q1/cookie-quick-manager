@@ -28,6 +28,7 @@ export function TransferDialog({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [replace, setReplace] = useState(false);
+  const [legacyNetscape, setLegacyNetscape] = useState(false);
   const [storeMode, setStoreMode] = useState<'preserve' | 'map'>('preserve');
   const [mappingAcknowledged, setMappingAcknowledged] = useState(false);
   const [summary, setSummary] = useState('');
@@ -65,7 +66,12 @@ export function TransferDialog({
   const collisionCount = destinations.length - new Set(destinations.map(cookieKey)).size;
   function review() {
     try {
-      setPreview(importCookies(text, { storeId: target }));
+      setPreview(
+        importCookies(text, {
+          storeId: target,
+          netscapeMode: legacyNetscape ? 'legacy-cqm' : 'standard',
+        }),
+      );
       setError('');
     } catch (reason) {
       setPreview(null);
@@ -224,6 +230,22 @@ export function TransferDialog({
               disabled={busy}
             />
           </label>
+          <label className="check-label">
+            <input
+              type="checkbox"
+              checked={legacyNetscape}
+              onChange={(event) => {
+                setLegacyNetscape(event.target.checked);
+                setPreview(null);
+              }}
+              disabled={busy}
+            />
+            Legacy Cookie Quick Manager Netscape export
+          </label>
+          <p className="small muted">
+            Enable only for the old extension’s Netscape files to repair its reversed domain-scope
+            flags.
+          </p>
           <label className="field">
             Store handling
             <select

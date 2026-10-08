@@ -29,6 +29,12 @@ independent of the historical Cookie Quick Manager version numbers.
   recreate cookies removed by websites or browser settings.
 - Startup cleanup is opt-in and bound to the browser's profile-startup event.
 - Local storage cleanup acts on the active origin after explicit confirmation.
+- Cookie and protection updates are coordinated across extension pages; saves
+  verify the written identity instead of trusting an ambiguous browser response.
+- Pending saves lock the draft, and externally deleted cookies remain visible
+  as unavailable records without enabling stale mutations.
+- Standard Netscape imports honor the include-subdomains flag. Old Cookie Quick
+  Manager text exports use an explicit compatibility option.
 - The first new interface is English. Historical French and German resources
   are retained in the archive but have not been ported to the new interface.
 

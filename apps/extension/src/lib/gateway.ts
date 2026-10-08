@@ -63,7 +63,7 @@ export interface BrowserApi {
   scripting?: {
     executeScript(details: {
       target: { tabId: number };
-      func: (origin: string) => void;
+      func: (origin: string) => { cleared: boolean };
       args: [string];
     }): Promise<unknown>;
   };
@@ -138,9 +138,19 @@ function equivalent(a: CookieRecord, b: CookieRecord): boolean {
   );
 }
 
+function baseIdentity(cookie: CookieRecord): string {
+  return cookieKey({
+    ...cookie,
+    ...(cookie.partitionKey
+      ? { partitionKey: { topLevelSite: cookie.partitionKey.topLevelSite } }
+      : {}),
+  });
+}
+
 /** Browser errors sometimes include submitted values, so expose fixed operation messages. */
-function failure(message: string): Error {
-  return new Error(message);
+export class GatewayError extends Error {}
+function failure(message: string): GatewayError {
+  return new GatewayError(message);
 }
 
 export interface GatewayContext {
@@ -163,6 +173,16 @@ export function createGateway(
     return result;
   }
 
+  async function readPreferences(): Promise<Preferences> {
+    const stored = await api.storage.local.get({ preferences: DEFAULT_PREFERENCES });
+    return preferencesFrom(stored.preferences);
+  }
+  async function persistPreferences(patch: Partial<Preferences>): Promise<Preferences> {
+    const preferences = preferencesFrom({ ...(await readPreferences()), ...patch });
+    await api.storage.local.set({ preferences });
+    return preferences;
+  }
+
   async function requireAccess(): Promise<void> {
     if (!(await api.permissions.contains({ origins: [...HOST_PERMISSIONS] }))) {
       throw failure('Allow website access before managing cookies.');
@@ -174,6 +194,22 @@ export function createGateway(
     if (firefox) normalized.firstPartyDomain ??= '';
     else delete normalized.firstPartyDomain;
     return normalized;
+  }
+
+  async function candidateScope(candidate: CookieRecord): Promise<CookieRecord[]> {
+    const cookies = await api.cookies.getAll({
+      name: candidate.name,
+      domain: cookieDomain(candidate.domain),
+      path: candidate.path,
+      storeId: candidate.storeId,
+      ...(firefox ? { firstPartyDomain: candidate.firstPartyDomain } : {}),
+      ...(candidate.partitionKey
+        ? { partitionKey: { topLevelSite: candidate.partitionKey.topLevelSite } }
+        : {}),
+    });
+    return cookies
+      .map(forBrowser)
+      .filter((cookie) => baseIdentity(cookie) === baseIdentity(candidate));
   }
 
   async function assertSelected(cookie: CookieRecord): Promise<void> {
@@ -279,21 +315,11 @@ export function createGateway(
         const originalKey = original && cookieKey(forBrowser(original));
         // Let the browser resolve partition origins and optional ancestor bits before
         // checking collisions; raw imported keys can have a different spelling.
-        const matches = await api.cookies.getAll({
-          name: candidate.name,
-          domain: cookieDomain(candidate.domain),
-          path: candidate.path,
-          storeId: candidate.storeId,
-          ...(firefox ? { firstPartyDomain: candidate.firstPartyDomain } : {}),
-          ...(candidate.partitionKey ? { partitionKey: candidate.partitionKey } : {}),
-        });
-        const targets = matches
-          .map(forBrowser)
-          .filter(
-            (item) =>
-              cookieDomain(item.domain) === cookieDomain(candidate.domain) &&
-              item.hostOnly === candidate.hostOnly,
-          );
+        const before = await candidateScope(candidate);
+        const matchesRequestedAncestor = (item: CookieRecord) =>
+          candidate.partitionKey?.hasCrossSiteAncestor === undefined ||
+          item.partitionKey?.hasCrossSiteAncestor === candidate.partitionKey.hasCrossSiteAncestor;
+        const targets = before.filter(matchesRequestedAncestor);
         if (targets.some((target) => cookieKey(target) !== originalKey)) {
           throw failure('A cookie already exists at this name, domain, path, store and partition.');
         }
@@ -305,29 +331,41 @@ export function createGateway(
           if (!targets.some((target) => cookieKey(target) === originalKey))
             await assertSelected(original);
         }
-        let saved: CookieRecord | null | undefined;
         try {
-          saved = await api.cookies.set(setDetails(candidate, firefox));
+          const acknowledged = await api.cookies.set(setDetails(candidate, firefox));
+          if (!acknowledged) throw failure('The browser did not save this cookie.');
         } catch {
           throw failure(
             'The browser rejected this cookie. Check its attributes and website access.',
           );
         }
-        if (!saved) throw failure('The browser did not save this cookie.');
-        const normalized = forBrowser(saved);
-        if (
-          candidate.partitionKey?.hasCrossSiteAncestor !== undefined &&
-          normalized.partitionKey?.hasCrossSiteAncestor !==
-            candidate.partitionKey.hasCrossSiteAncestor
-        ) {
+        // Firefox may return an older same-name sibling from cookies.set().
+        // Resolve the written identity independently; never use that return value
+        // as a deletion or rollback target.
+        const after = await candidateScope(candidate);
+        const resolved = after.filter(matchesRequestedAncestor);
+        if (resolved.length !== 1 && candidate.partitionKey?.hasCrossSiteAncestor !== undefined) {
+          const changed = after.filter((item) => {
+            const previous = before.find((old) => cookieKey(old) === cookieKey(item));
+            return item.value === candidate.value && (!previous || !equivalent(previous, item));
+          });
+          if (changed.length !== 1) {
+            throw failure('The browser write could not be verified. Refresh to review the cookie.');
+          }
+          const written = changed[0]!;
+          const previous = before.find((old) => cookieKey(old) === cookieKey(written));
           try {
-            if (original && cookieKey(normalized) === originalKey) {
-              const restored = await api.cookies.set(setDetails(forBrowser(original), firefox));
-              if (!restored || cookieKey(forBrowser(restored)) !== originalKey) {
+            if (previous) {
+              await assertSelected(written);
+              await api.cookies.set(setDetails(previous, firefox));
+              const restored = (await candidateScope(previous)).find(
+                (item) => cookieKey(item) === cookieKey(previous),
+              );
+              if (!restored || !equivalent(restored, previous)) {
                 throw failure('The original cookie could not be restored.');
               }
             } else {
-              await removeExact(normalized);
+              await removeExact(written);
             }
           } catch {
             throw failure(
@@ -337,6 +375,18 @@ export function createGateway(
           throw failure(
             'The browser could not preserve the partition ancestor bit. The change was rolled back.',
           );
+        }
+        const normalized = resolved[0];
+        if (
+          resolved.length !== 1 ||
+          !normalized ||
+          normalized.value !== candidate.value ||
+          normalized.secure !== candidate.secure ||
+          normalized.httpOnly !== candidate.httpOnly ||
+          normalized.session !== candidate.session ||
+          normalized.sameSite !== candidate.sameSite
+        ) {
+          throw failure('The browser write could not be verified. Refresh to review the cookie.');
         }
         if (original && cookieKey(normalized) !== originalKey) {
           try {
@@ -355,7 +405,7 @@ export function createGateway(
           }
           const preferences = await gateway.getPreferences();
           if (preferences.protectedKeys.includes(originalKey!)) {
-            await gateway.updatePreferences({
+            await persistPreferences({
               protectedKeys: preferences.protectedKeys.map((key) =>
                 key === originalKey ? cookieKey(normalized) : key,
               ),
@@ -389,14 +439,20 @@ export function createGateway(
         return result;
       });
     },
-    async getPreferences() {
-      const stored = await api.storage.local.get({ preferences: DEFAULT_PREFERENCES });
-      return preferencesFrom(stored.preferences);
+    getPreferences: readPreferences,
+    updatePreferences(patch) {
+      return serial(() => persistPreferences(patch));
     },
-    async updatePreferences(patch) {
-      const preferences = preferencesFrom({ ...(await gateway.getPreferences()), ...patch });
-      await api.storage.local.set({ preferences });
-      return preferences;
+    setProtection(cookies, value) {
+      return serial(async () => {
+        const preferences = await readPreferences();
+        const keys = new Set(preferences.protectedKeys);
+        for (const cookie of cookies) {
+          if (value) keys.add(cookieKey(cookie));
+          else keys.delete(cookieKey(cookie));
+        }
+        return persistPreferences({ protectedKeys: [...keys] });
+      });
     },
     subscribe(listener) {
       const changed: Listener = () => listener();
@@ -439,15 +495,30 @@ export function createGateway(
         if (!tab || !api.scripting)
           throw failure('Open a website tab before clearing its local storage.');
         try {
-          await api.scripting.executeScript({
+          const results = await api.scripting.executeScript({
             target: { tabId: tab.id },
             func: (expectedOrigin: string) => {
-              if (location.origin !== expectedOrigin)
-                throw new Error('The tab navigated; no storage was cleared.');
-              localStorage.clear();
+              try {
+                if (location.origin !== expectedOrigin) return { cleared: false };
+                localStorage.clear();
+                return { cleared: true };
+              } catch {
+                return { cleared: false };
+              }
             },
             args: [new URL(tab.url).origin],
           });
+          // Script failures may resolve rather than reject on either platform.
+          // Require an acknowledgement from the one targeted main frame.
+          if (
+            !Array.isArray(results) ||
+            results.length !== 1 ||
+            results[0]?.frameId !== 0 ||
+            'error' in results[0] ||
+            results[0]?.result?.cleared !== true
+          ) {
+            throw failure('The tab did not confirm that its local storage was cleared.');
+          }
         } catch {
           throw failure('The tab navigated or its local storage could not be cleared.');
         }
@@ -471,27 +542,32 @@ export function createGateway(
 }
 
 /** Register synchronously. Worker initialization must never trigger cookie cleanup. */
-export function registerBackground(api: BrowserApi, gateway = createGateway(api)): () => void {
-  const onStartup = async () => {
-    try {
-      const preferences = await gateway.getPreferences();
-      if (!preferences.cleanOnStartup || !(await gateway.getStatus()).hostAccess) return;
-      const result = await gateway.deleteCookies(await gateway.listCookies());
-      await api.storage.local.set({
-        lastStartupCleanup: {
-          at: Date.now(),
-          deleted: result.deleted.length,
-          protected: result.protected.length,
-          failed: result.failed.length,
-        },
-      });
-    } catch {
-      // Browser availability can change during startup; never retry on worker wake.
-      await api.storage.local
-        .set({ lastStartupCleanup: { at: Date.now(), failed: true } })
-        .catch(() => undefined);
-    }
-  };
+export function registerBackground(
+  api: BrowserApi,
+  gateway = createGateway(api),
+  enqueue: <T>(operation: () => Promise<T>) => Promise<T> = (operation) => operation(),
+): () => void {
+  const onStartup = () =>
+    enqueue(async () => {
+      try {
+        const preferences = await gateway.getPreferences();
+        if (!preferences.cleanOnStartup || !(await gateway.getStatus()).hostAccess) return;
+        const result = await gateway.deleteCookies(await gateway.listCookies());
+        await api.storage.local.set({
+          lastStartupCleanup: {
+            at: Date.now(),
+            deleted: result.deleted.length,
+            protected: result.protected.length,
+            failed: result.failed.length,
+          },
+        });
+      } catch {
+        // Browser availability can change during startup; never retry on worker wake.
+        await api.storage.local
+          .set({ lastStartupCleanup: { at: Date.now(), failed: true } })
+          .catch(() => undefined);
+      }
+    });
   api.runtime.onStartup.addListener(onStartup);
   return () => api.runtime.onStartup.removeListener(onStartup);
 }

@@ -335,10 +335,41 @@ describe('Netscape format', () => {
     );
   });
 
-  it('recognizes historical reversed flags and warns about the inferred scope', () => {
-    const result = importCookies('.example.com\tFALSE\t/\tTRUE\t0\ttoken\tabc', options);
-    expect(result.cookies[0]?.hostOnly).toBe(false);
-    expect(result.warnings.join(' ')).toMatch(/flag conflicts/);
+  it.each([
+    ['example.com', 'TRUE', '.example.com', false],
+    ['.example.com', 'FALSE', 'example.com', true],
+  ] as const)(
+    'honors the standard scope flag for %s %s',
+    (domain, flag, expectedDomain, hostOnly) => {
+      const result = importCookies(`${domain}\t${flag}\t/\tTRUE\t0\ttoken\tabc`, options);
+      expect(result.errors).toEqual([]);
+      expect(result.cookies[0]).toMatchObject({ domain: expectedDomain, hostOnly });
+      expect(result.warnings.join(' ')).not.toMatch(/Legacy Cookie Quick Manager mode/);
+    },
+  );
+
+  it.each([
+    ['example.com', 'TRUE', 'example.com', true],
+    ['.example.com', 'FALSE', '.example.com', false],
+  ] as const)(
+    'repairs old CQM scope only with explicit opt-in for %s %s',
+    (domain, flag, expectedDomain, hostOnly) => {
+      const result = importCookies(`${domain}\t${flag}\t/\tTRUE\t0\ttoken\tabc`, {
+        ...options,
+        netscapeMode: 'legacy-cqm',
+      });
+      expect(result.errors).toEqual([]);
+      expect(result.cookies[0]).toMatchObject({ domain: expectedDomain, hostOnly });
+      expect(result.warnings.join(' ')).toMatch(/Legacy Cookie Quick Manager mode is enabled/);
+    },
+  );
+
+  it('normalizes only the scope dot and continues rejecting malformed domains', () => {
+    for (const domain of ['..example.com', 'example.com/path', 'example.com:123']) {
+      expect(importCookies(`${domain}\tTRUE\t/\tTRUE\t0\ttoken\tabc`, options).errors).toHaveLength(
+        1,
+      );
+    }
   });
 
   it('reports malformed records and expired dates with line numbers', () => {

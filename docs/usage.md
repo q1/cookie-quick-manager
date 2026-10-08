@@ -65,6 +65,10 @@ Cookie Loom refuses stale edits and ambiguous browser targets. If a refreshed
 record differs from the one you started editing, **Reload cookie** lets you
 inspect the current version before trying again. Reloading a dirty draft also
 asks before discarding your changes.
+If the cookie was deleted externally, the inspector keeps your draft but disables
+mutation and reload controls. Close it and deliberately create a new cookie if
+needed. Fields are disabled while a save is pending so a late response cannot
+overwrite newer typing.
 
 Protection skips a cookie during Cookie Loom deletion and cleanup. It does not
 stop sites, other extensions, expiry, or the browser from deleting it. Protected
@@ -112,6 +116,12 @@ is blocked when separate source cookies would collapse into the same identity.
 Review warnings and invalid rows before applying the valid records. Existing
 matches are skipped unless you enable replacement, and protected records are
 always skipped. Partial success is possible; inspect the completion counts.
+
+Standard Netscape imports use the file's include-subdomains flag to determine
+cookie scope. For a text export made by the old Cookie Quick Manager, explicitly
+enable its compatibility option before reviewing the file: that extension wrote
+the flag in reverse, so this mode derives scope from the leading domain dot.
+Leave it off for Cookie Loom, curl, and other standard Netscape exports.
 
 Browser-specific metadata cannot always move between browsers. In particular,
 Chromium does not support Firefox's first-party isolation field. Cookie Loom

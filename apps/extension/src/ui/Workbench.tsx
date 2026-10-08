@@ -57,6 +57,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
   const [creating, setCreating] = useState(false);
   const [editorVersion, setEditorVersion] = useState(0);
   const focusedCookie = useRef<CookieRecord | null>(null);
+  const [pendingSavedKey, setPendingSavedKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [transfer, setTransfer] = useState<'import' | 'export' | null>(null);
@@ -68,8 +69,14 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
   const [showValues, setShowValues] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const editorDirty = useRef(false);
+  const editorSavingRef = useRef(false);
+  const [editorSaving, setEditorSaving] = useState(false);
   const onEditorDirty = useCallback((dirty: boolean) => {
     editorDirty.current = dirty;
+  }, []);
+  const onEditorSaving = useCallback((saving: boolean) => {
+    editorSavingRef.current = saving;
+    setEditorSaving(saving);
   }, []);
   const search = useRef<HTMLInputElement>(null);
   const demoOpened = useRef(false);
@@ -105,11 +112,14 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
   );
   const pageCookies = visible.slice(page * 100, (page + 1) * 100);
   const chosen = visible.filter((cookie) => selected.has(cookieKey(cookie)));
-  const original = focused
-    ? (cookies.find((cookie) => cookieKey(cookie) === focused) ??
-      focusedCookie.current ??
-      undefined)
+  const liveOriginal = focused
+    ? cookies.find((cookie) => cookieKey(cookie) === focused)
     : undefined;
+  // Retain the open draft after deletion, but never present this snapshot as a live cookie.
+  const original = focused ? (liveOriginal ?? focusedCookie.current ?? undefined) : undefined;
+  const missingFocused = Boolean(
+    focused && !liveOriginal && pendingSavedKey !== focused && !loading && !error,
+  );
   const cookieSeed = useMemo(
     (): CookieRecord => ({
       name: '',
@@ -141,6 +151,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
     setSelected(new Set());
   }
   function navigate(action: () => void) {
+    if (editorSavingRef.current) return;
     if (editorDirty.current) setPendingNavigation(() => action);
     else action();
   }
@@ -280,7 +291,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
               <div className="header-actions">
                 <button
                   className="button"
-                  disabled={!status?.hostAccess}
+                  disabled={!status?.hostAccess || editorSaving}
                   onClick={() => setTransfer('import')}
                 >
                   <Upload size={17} />
@@ -296,7 +307,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                 </button>
                 <button
                   className="button primary"
-                  disabled={!status?.hostAccess}
+                  disabled={!status?.hostAccess || editorSaving}
                   onClick={newCookie}
                 >
                   <Plus size={18} />
@@ -403,7 +414,10 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                         className="icon-button bordered danger-text"
                         aria-label="Clear unprotected"
                         title="Clear unprotected cookies in this view"
-                        disabled={!visible.some((cookie) => !protectedKeys.has(cookieKey(cookie)))}
+                        disabled={
+                          editorSaving ||
+                          !visible.some((cookie) => !protectedKeys.has(cookieKey(cookie)))
+                        }
                         onClick={() =>
                           setDeleting(
                             visible.filter((cookie) => !protectedKeys.has(cookieKey(cookie))),
@@ -427,7 +441,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                       </button>
                       <button
                         className="text-button"
-                        disabled={stores.length < 2}
+                        disabled={stores.length < 2 || editorSaving}
                         onClick={() => setCopying(chosen)}
                       >
                         <Copy size={16} />
@@ -435,6 +449,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                       </button>
                       <button
                         className="text-button"
+                        disabled={editorSaving}
                         onClick={() => {
                           void protect(chosen, true)
                             .then(() => notify('Selected cookies protected.'))
@@ -446,6 +461,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                       </button>
                       <button
                         className="text-button"
+                        disabled={editorSaving}
                         onClick={() => {
                           void protect(chosen, false)
                             .then(() => notify('Protection removed.'))
@@ -457,6 +473,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                       </button>
                       <button
                         className="text-button danger-text"
+                        disabled={editorSaving}
                         onClick={() => setDeleting(chosen)}
                       >
                         <Trash2 size={16} />
@@ -563,7 +580,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                       <span>{undo.length} cookies deleted</span>
                       <button
                         className="text-button"
-                        disabled={busy}
+                        disabled={busy || editorSaving}
                         onClick={() => void restore()}
                       >
                         <Undo2 size={16} />
@@ -590,6 +607,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                   <CookieEditor
                     key={original ? cookieKey(original) : `new-${editorVersion}`}
                     original={original}
+                    missing={missingFocused}
                     seed={original ?? cookieSeed}
                     onClose={() => {
                       setFocused(null);
@@ -597,12 +615,17 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                     }}
                     onSaved={(cookie) => {
                       focusedCookie.current = cookie;
+                      const savedKey = cookieKey(cookie);
+                      setPendingSavedKey(savedKey);
                       setCreating(false);
-                      setFocused(cookieKey(cookie));
-                      void refresh();
+                      setFocused(savedKey);
+                      void refresh().finally(() => {
+                        setPendingSavedKey((current) => (current === savedKey ? null : current));
+                      });
                     }}
                     onDelete={setDeleting}
                     onDirtyChange={onEditorDirty}
+                    onSavingChange={onEditorSaving}
                   />
                 )}
               </div>

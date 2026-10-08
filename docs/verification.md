@@ -12,14 +12,17 @@ plus 320-, 390-, 768-, 1024-, and 1440-pixel layout checks. It covers CRUD, hidd
 store filtering, protected cleanup and undo, import preview and isolation
 safeguards, file export, copy-to-store, value conversion, keyboard dialogs,
 themes, popup navigation, unsaved edits, stale-edit protection, value copying,
-and keyboard shortcuts. It also loads the unchanged Chromium artifact
+keyboard shortcuts, pending saves, deleted records, and explicit legacy Netscape
+scope handling. It also loads the unchanged Chromium artifact
 to check its no-host-access state, then uses a disposable copy with test-only
 host grants for real cookie operations. No cookie API mocks are used in those
 native extension checks.
 
 `npm run test:firefox` exercises Firefox's native cookie, store, container,
 partition, first-party isolation, and background lifecycle APIs in a disposable
-profile. Its temporary artifact also adds test-only host grants. These harnesses
+profile. Its temporary artifact also adds test-only host grants and a fixture
+page that exercises the unchanged production background's mutation coordinator.
+These harnesses
 leave the production manifests unchanged. Accepting/rejecting native optional
 permission prompts, store installation/signing, and real private-window UI
 remain manual checks.
@@ -31,12 +34,18 @@ permission test.
 
 ### Local verification record
 
-On 2026-10-08, the refined rewrite passed 104 unit tests, 49 Playwright tests, and
-11 native Firefox API checks. The Playwright runs used Chromium 149 and Firefox
+On 2026-10-08, the reviewed rewrite passed 144 unit tests, 57 Playwright tests, and
+13 native Firefox API checks. The Playwright runs used Chromium 149 and Firefox
 151, including the responsive viewport matrix. The native Firefox run used Firefox 151.
 Both browser builds completed, and the Firefox validation wrapper reported no
 errors or unexpected warnings (with the two reviewed React vendor warnings
 described in the development guide).
+
+The [independent review record](review-2026-10-08.md) describes the reproduced
+findings and their corrections. Native Firefox checks include editing coexisting
+host-only/domain cookies and concurrent requests from an extension page to the
+production background coordinator. Unit checks also exercise callback-only
+message delivery for older supported Chromium versions.
 
 Both extension archives were inspected for the expected manifests and bundled
 license notices, with no demo entrypoints or legacy code. The source archive

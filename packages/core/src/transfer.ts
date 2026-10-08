@@ -256,6 +256,13 @@ export function importCookies(text: string, options: ImportOptions): ImportResul
     result.errors.push({ message: 'Current time must be a finite Unix timestamp in seconds.' });
     return result;
   }
+  if (
+    options.netscapeMode !== undefined &&
+    !['standard', 'legacy-cqm'].includes(options.netscapeMode)
+  ) {
+    result.errors.push({ message: 'Select a supported Netscape import mode.' });
+    return result;
+  }
   const keys = new Set<string>();
   const add = (value: unknown, location: { index?: number; line?: number }) => {
     const issues = validateCookie(value, { now: options.now });
@@ -336,6 +343,11 @@ export function importCookies(text: string, options: ImportOptions): ImportResul
       warnings.add(
         `Netscape cookies use the selected store (${options.storeId}) and SameSite=unspecified.`,
       );
+      if (options.netscapeMode === 'legacy-cqm') {
+        warnings.add(
+          'Legacy Cookie Quick Manager mode is enabled: cookie scope is inferred from domain dots instead of the include-subdomains column.',
+        );
+      }
       // Do not trim records: the last field may intentionally be an empty value.
       const lines = content.split(/\r\n|\n|\r/);
       let records = 0;
@@ -362,21 +374,20 @@ export function importCookies(text: string, options: ImportOptions): ImportResul
           ];
           const flag = booleanField(includeSubdomains, 'Include subdomains');
           const dotted = domain.startsWith('.');
-          // Cookie Quick Manager wrote the inverse of Netscape's second column.
-          // Its leading domain dot is the only surviving indication of original scope.
-          if (flag !== dotted)
-            warnings.add(
-              'A Netscape domain flag conflicts with its leading dot. Scope was inferred from the dot to support legacy Cookie Quick Manager exports; review it before importing.',
-            );
+          // The second column controls scope in standard Netscape files. Old CQM
+          // exports inverted that column, so only explicitly selected legacy mode
+          // uses the leading dot. Never guess the source of an untrusted file.
+          const hostOnly = !(options.netscapeMode === 'legacy-cqm' ? dotted : flag);
+          const bareDomain = dotted ? domain.slice(1) : domain;
           const expiry = expiration(expires);
           const cookie: CookieRecord = {
-            domain,
+            domain: `${hostOnly ? '' : '.'}${bareDomain}`,
             path,
             name,
             value,
             secure: booleanField(secure, 'Secure'),
             httpOnly,
-            hostOnly: !dotted,
+            hostOnly,
             session: expiry === undefined,
             sameSite: 'unspecified',
             storeId: options.storeId,

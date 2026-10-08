@@ -40,6 +40,9 @@ cookies; security flags and expiry are data, not substitutes for identity.
 Editing identity fields is a move: write the validated replacement, then remove
 the old identity safely. Do not remove the old cookie if creating its replacement
 failed. Browser cookie operations are individually fallible and not atomic.
+After a write, resolve the saved record from its complete identity; Firefox's
+`cookies.set()` return value can refer to another matching cookie. Never use an
+unverified response as a rollback or deletion target.
 
 Chromium and Firefox do not expose identical partition and store APIs. The
 adapter translates supported fields and reports unsupported operations. It
@@ -71,6 +74,11 @@ and [Mozilla](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtens
 - Browser cookie stores remain the source of truth for cookies.
 - Local extension storage persists settings and protected identities, not a
   shadow copy of every cookie value.
+- The background context coordinates cookie and preference mutations from all
+  extension pages. Protection changes add or remove identities inside that
+  queue, avoiding a read-modify-write race between a popup and a workbench.
+  Website and browser writes remain outside this queue; stale records and
+  ambiguous browser targets are rejected where the API can detect them.
 - Undo is temporary session state and best effort. Never rely on a long-lived
   Manifest V3 background process or promise recovery after shutdown.
 - Startup cleanup is registered with `runtime.onStartup`. Loading or waking a
@@ -89,6 +97,13 @@ Netscape files cannot represent container, SameSite, first-party, or partition
 fields. A transfer is not necessarily a portable authenticated session.
 
 Privileged operations run in extension contexts without a page-facing bridge.
+Mutation messages use an explicit operation allowlist and accept only this
+extension's own pages. Read operations and user-gesture permission requests
+stay in the originating page. Local storage cleanup checks the source origin
+inside the target frame and requires an explicit success acknowledgement.
+Background replies use `sendResponse` with an explicit `return true`, preserving
+compatibility with Chromium versions that do not support Promise-returning
+message listeners.
 Render data as text and bundle all runtime assets locally. New remote
 dependencies, permissions, or persisted data require a documented design decision.
 

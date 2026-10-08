@@ -23,12 +23,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testMatch: /demo\.spec\.ts/,
+      testMatch: /(?:demo|review|transfer-review)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 1000 } },
     },
     {
       name: 'firefox',
-      testMatch: /demo\.spec\.ts/,
+      testMatch: /(?:demo|review|transfer-review)\.spec\.ts/,
       use: { ...devices['Desktop Firefox'], viewport: { width: 1440, height: 1000 } },
     },
     {

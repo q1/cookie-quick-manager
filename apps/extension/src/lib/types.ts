@@ -34,6 +34,7 @@ export interface Gateway {
   deleteCookies(cookies: CookieRecord[]): Promise<DeleteResult>;
   getPreferences(): Promise<Preferences>;
   updatePreferences(patch: Partial<Preferences>): Promise<Preferences>;
+  setProtection(cookies: CookieRecord[], value: boolean): Promise<Preferences>;
   subscribe(listener: () => void): () => void;
   getCurrentTab(): Promise<CurrentTab | null>;
   clearCurrentTabLocalStorage(): Promise<void>;

@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { createGateway, type BrowserApi, type GatewayContext } from './gateway';
+import { withRemoteMutations } from './mutation-coordinator';
 
 const query = new URLSearchParams(location.search);
 const sourceTab = query.get('sourceTab');
@@ -17,4 +18,7 @@ const context: GatewayContext = {
   useActiveTab: /\/popup(?:\/index)?\.html$/.test(location.pathname),
 };
 
-export const browserGateway = createGateway(browser as unknown as BrowserApi, context);
+export const browserGateway = withRemoteMutations(
+  createGateway(browser as unknown as BrowserApi, context),
+  (message) => browser.runtime.sendMessage(message),
+);

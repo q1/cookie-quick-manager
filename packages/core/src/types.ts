@@ -61,6 +61,8 @@ export interface ImportResult {
 export interface ImportOptions {
   /** Explicit fallback for formats without a cookie store. Never overrides saved stores. */
   storeId: string;
+  /** Standard files use the include-subdomains column. Legacy CQM files use domain dots. */
+  netscapeMode?: 'standard' | 'legacy-cqm';
   /** Current Unix time in seconds, primarily useful for deterministic previews/tests. */
   now?: number;
 }

@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { cookieKey, type CookieRecord, type CookieStore } from '@cookie-loom/core';
+import { type CookieRecord, type CookieStore } from '@cookie-loom/core';
 import type { CurrentTab, Gateway, GatewayStatus, Preferences } from '../lib/types';
 
 interface Workspace {
@@ -109,12 +109,7 @@ export function WorkspaceProvider({
     [gateway],
   );
   const protect = async (items: CookieRecord[], value: boolean) => {
-    const latest = await gateway.getPreferences();
-    const keys = new Set(latest.protectedKeys);
-    items.forEach((cookie) =>
-      value ? keys.add(cookieKey(cookie)) : keys.delete(cookieKey(cookie)),
-    );
-    await updatePreferences({ protectedKeys: [...keys] });
+    setPreferences(await gateway.setProtection(items, value));
   };
   return (
     <Context.Provider
