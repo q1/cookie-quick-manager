@@ -55,6 +55,85 @@ test('the unchanged production extension loads with an explicit no-host-access s
   }
 });
 
+test('large domain lists stay searchable and the popup retains parent paths and partitions', async () => {
+  const temporary = await mkdtemp(path.join(tmpdir(), 'cookie-loom-scoped-popup-'));
+  let context: BrowserContext | undefined;
+  try {
+    const directory = path.join(temporary, 'extension');
+    await cp(buildDirectory, directory, { recursive: true });
+    const manifestPath = path.join(directory, 'manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    manifest.host_permissions = ['http://*/*', 'https://*/*'];
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    const launched = await launchExtension(directory);
+    context = launched.context;
+    await context.addCookies(
+      Array.from({ length: 120 }, (_, index) => ({
+        url: `https://site${String(index).padStart(3, '0')}.test/`,
+        name: `seed_${index}`,
+        value: 'synthetic',
+      })),
+    );
+    await context.addCookies([
+      {
+        domain: '.example.test',
+        path: '/account',
+        name: 'parent_path',
+        value: 'synthetic',
+        secure: true,
+      },
+      { url: 'https://app.example.test/', name: 'host', value: 'synthetic' },
+      { url: 'https://example.test/', name: 'parent_host', value: 'synthetic' },
+      { url: 'https://other.example.test/', name: 'sibling', value: 'synthetic' },
+    ]);
+    const worker = context.serviceWorkers()[0]!;
+    await worker.evaluate(async () => {
+      await chrome.cookies.set({
+        url: 'https://app.example.test/',
+        name: 'partition',
+        value: 'synthetic',
+        secure: true,
+        sameSite: 'no_restriction',
+        partitionKey: { topLevelSite: 'https://first.test', hasCrossSiteAncestor: true },
+      });
+    });
+    const { page, errors } = await workbench(context, launched.id);
+    await expect(page.locator('.domain-item')).toHaveCount(50);
+    await page.getByRole('button', { name: /Show more domains/ }).click();
+    await expect(page.locator('.domain-item')).toHaveCount(100);
+    await page.getByRole('searchbox', { name: 'Find a domain' }).fill('site119.test');
+    await expect(page.locator('.domain-item')).toHaveCount(1);
+    await page.locator('.domain-item').click();
+    await expect(page.locator('.cookie-table tbody tr')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'seed_119', exact: true })).toBeVisible();
+    await page.getByRole('searchbox', { name: 'Find a domain' }).fill('');
+    await expect(page.locator('.domain-item.active')).toHaveText(/site119.test/);
+    await expect(page.locator('.domain-item')).toHaveCount(51);
+    await context.route('https://app.example.test/**', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<!doctype html><title>Synthetic site</title>',
+      }),
+    );
+    const site = await context.newPage();
+    await site.goto('https://app.example.test/');
+    const sourceTab = await worker.evaluate(
+      async () =>
+        (await chrome.tabs.query({})).find((tab) => tab.url === 'https://app.example.test/')!.id,
+    );
+    const popup = await context.newPage();
+    await popup.goto(
+      `chrome-extension://${launched.id}/popup.html?sourceTab=${sourceTab}&sourceOrigin=${encodeURIComponent('https://app.example.test')}`,
+    );
+    await expect(popup.locator('.popup-summary strong').first()).toHaveText('3cookies');
+    await expect(popup.locator('.popup-summary strong').nth(1)).toHaveText('0protected');
+    expect(errors).toEqual([]);
+  } finally {
+    await context?.close();
+    await rm(temporary, { recursive: true, force: true });
+  }
+});
+
 test('the compiled Chromium adapter edits real cookies and preserves protected cleanup with undo', async () => {
   test.setTimeout(45_000);
   const temporary = await mkdtemp(path.join(tmpdir(), 'cookie-loom-chromium-'));

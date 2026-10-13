@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Cookie, Shield, Settings, Globe2, LockKeyhole } from 'lucide-react';
-import { cookieKey, groupCookiesByDomain } from '@cookie-loom/core';
+import { cookieKey } from '@cookie-loom/core';
 import { Brand } from './shared';
 import { useWorkspace } from './context';
 
@@ -14,11 +14,20 @@ export function Sidebar({
   domain: string;
   onNavigate: (view: View, domain?: string) => void;
 }) {
-  const { cookies, gateway, preferences } = useWorkspace();
+  const { cookies, gateway, preferences, domains } = useWorkspace();
   const [query, setQuery] = useState('');
-  const groups = useMemo(() => groupCookiesByDomain(cookies), [cookies]);
-  const keys = new Set(preferences.protectedKeys);
-  const protectedCount = cookies.filter((cookie) => keys.has(cookieKey(cookie))).length;
+  const [limit, setLimit] = useState(50);
+  const groups = useMemo(
+    () => domains.filter((group) => group.domain.toLowerCase().includes(query.toLowerCase())),
+    [domains, query],
+  );
+  const visibleGroups = groups.slice(0, limit);
+  const active = groups.find((group) => group.domain === domain);
+  if (active && !visibleGroups.includes(active)) visibleGroups.unshift(active);
+  const protectedCount = useMemo(() => {
+    const keys = new Set(preferences.protectedKeys);
+    return cookies.filter((cookie) => keys.has(cookieKey(cookie))).length;
+  }, [cookies, preferences.protectedKeys]);
   return (
     <aside className="sidebar">
       <Brand />
@@ -56,33 +65,43 @@ export function Sidebar({
       </nav>
       <nav className="domain-nav" aria-label="Cookie domains">
         <div className="nav-label">Domains</div>
-        {groups.length > 8 && (
+        {domains.length > 8 && (
           <input
             className="domain-search"
             type="search"
             aria-label="Find a domain"
             placeholder="Find a domain…"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setLimit(50);
+            }}
           />
         )}
-        {groups
-          .filter((group) => group.domain.toLowerCase().includes(query.toLowerCase()))
-          .map((group) => (
-            <button
-              key={group.domain}
-              className={`nav-item domain-item ${domain === group.domain && view === 'cookies' ? 'active' : ''}`}
-              aria-current={domain === group.domain && view === 'cookies' ? 'page' : undefined}
-              onClick={() => onNavigate('cookies', group.domain)}
-              title={group.domain}
-            >
-              <Globe2 size={16} />
-              <span>{group.domain}</span>
-              <span className="count" aria-hidden="true">
-                {group.cookies.length}
-              </span>
-            </button>
-          ))}
+        {visibleGroups.map((group) => (
+          <button
+            key={group.domain}
+            className={`nav-item domain-item ${domain === group.domain && view === 'cookies' ? 'active' : ''}`}
+            aria-current={domain === group.domain && view === 'cookies' ? 'page' : undefined}
+            onClick={() => onNavigate('cookies', group.domain)}
+            title={group.domain}
+          >
+            <Globe2 size={16} />
+            <span>{group.domain}</span>
+            <span className="count" aria-hidden="true">
+              {group.count}
+            </span>
+          </button>
+        ))}
+        {groups.length > visibleGroups.length && (
+          <button
+            className="text-button domain-more"
+            onClick={() => setLimit((value) => value + 50)}
+          >
+            Show more domains ({groups.length - visibleGroups.length})
+          </button>
+        )}
+        {query && !groups.length && <p className="small muted nav-empty">No matching domains</p>}
         {cookies.length === 0 && <p className="small muted nav-empty">No domains</p>}
       </nav>
       <div className="privacy-foot">

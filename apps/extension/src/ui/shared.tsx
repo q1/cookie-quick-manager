@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useId, useRef, type ReactNode } from 'react';
 import { Link2, X, AlertCircle, Database, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useWorkspace } from './context';
 
@@ -47,13 +47,16 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = ref.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog?.showModal();
     return () => {
       dialog?.close();
-      opener?.focus();
+      // Nested dialogs must all close before focus can leave the inert subtree.
+      queueMicrotask(() => {
+        if (opener?.isConnected) opener.focus();
+      });
     };
   }, []);
   return (
@@ -133,14 +136,15 @@ export function hostOf(url?: string) {
     return '';
   }
 }
+let dateFormatter: Intl.DateTimeFormat | undefined;
 export function expiryLabel(session: boolean, expirationDate?: number) {
   return session || expirationDate === undefined
     ? 'Session'
-    : new Intl.DateTimeFormat(undefined, {
+    : (dateFormatter ??= new Intl.DateTimeFormat(undefined, {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
-      }).format(new Date(expirationDate * 1000));
+      })).format(new Date(expirationDate * 1000));
 }
 export async function copyText(text: string) {
   await navigator.clipboard.writeText(text);

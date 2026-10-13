@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "extensionVersion": "0.1.1",
+  "platform": "linux-x64",
+  "browser": "149.0.7827.55",
+  "bun": "1.4.3",
+  "productionManifestSha256": "8dc3575a1eb01c72361122c3e9ab5deaba9ca5ce970c7d6bcd912eb6317a329f",
+  "syntheticCookies": 2000,
+  "currentSiteCookies": 30,
+  "cpuThrottle": 4,
+  "samples": 7,
+  "warmups": 1,
+  "upfrontTestHostGrants": true,
+  "temporaryProfile": true,
+  "milliseconds": {
+    "workbench": {
+      "median": 201.7,
+      "samples": [205.2, 188.4, 188.6, 190.1, 206.2, 207.3, 201.7]
+    },
+    "search": {
+      "median": 90.2,
+      "samples": [90.2, 98.4, 97.1, 96.7, 81.4, 80.8, 81.4]
+    },
+    "edit": {
+      "median": 120.7,
+      "samples": [128.6, 119.5, 121, 122.2, 112.5, 111, 120.7]
+    },
+    "popup": {
+      "median": 78.9,
+      "samples": [79.5, 78.2, 78.9, 65.6, 66, 82.4, 80.3]
+    }
+  },
+  "api": {
+    "workbench": [
+      {
+        "getAll": 1,
+        "stores": 1,
+        "records": 2000,
+        "formatters": 1,
+        "domainButtons": 50
+      },
+      {
+        "getAll": 1,
+        "stores": 1,
+        "records": 2000,
+        "formatters": 1,
+        "domainButtons": 50
+      },
+      {
+        "getAll": 1,
+        "stores": 1,
+        "records": 2000,
+        "formatters": 1,
+        "domainButtons": 50
+      },
+      {
+        "getAll": 1,
+        "stores": 1,
+        "records": 2000,
+        "formatters": 1,
+        "domainButtons": 50
+      },
+      {
+        "getAll": 1,
+        "stores": 1,
+        "records": 2000,
+        "formatters": 1,
+        "domainButtons": 50
+      },
+      {
+        "getAll": 1,
+        "stores": 1,
+        "records": 2000,
+        "formatters": 1,
+        "domainButtons": 50
+      },
+      {
+        "getAll": 1,
+        "stores": 1,
+        "records": 2000,
+        "formatters": 1,
+        "domainButtons": 50
+      }
+    ],
+    "popup": [
+      {
+        "getAll": 1,
+        "stores": 2,
+        "records": 30,
+        "formatters": 0
+      },
+      {
+        "getAll": 1,
+        "stores": 2,
+        "records": 30,
+        "formatters": 0
+      },
+      {
+        "getAll": 1,
+        "stores": 2,
+        "records": 30,
+        "formatters": 0
+      },
+      {
+        "getAll": 1,
+        "stores": 2,
+        "records": 30,
+        "formatters": 0
+      },
+      {
+        "getAll": 1,
+        "stores": 2,
+        "records": 30,
+        "formatters": 0
+      },
+      {
+        "getAll": 1,
+        "stores": 2,
+        "records": 30,
+        "formatters": 0
+      },
+      {
+        "getAll": 1,
+        "stores": 2,
+        "records": 30,
+        "formatters": 0
+      }
+    ],
+    "edit": [
+      {
+        "getAll": 2,
+        "records": 2,
+        "stores": 0
+      },
+      {
+        "getAll": 2,
+        "records": 2,
+        "stores": 0
+      },
+      {
+        "getAll": 2,
+        "records": 2,
+        "stores": 0
+      },
+      {
+        "getAll": 2,
+        "records": 2,
+        "stores": 0
+      },
+      {
+        "getAll": 2,
+        "records": 2,
+        "stores": 0
+      },
+      {
+        "getAll": 2,
+        "records": 2,
+        "stores": 0
+      },
+      {
+        "getAll": 2,
+        "records": 2,
+        "stores": 0
+      }
+    ]
+  },
+  "initialJavaScript": {
+    "workbench": {
+      "files": [
+        "chunks/workbench-DsgkWFmf.js",
+        "chunks/ui-vendor-CuyaPpbb.js",
+        "chunks/styles-DPDgEBeF.js",
+        "chunks/Workbench-UL4csKSB.js"
+      ],
+      "bytes": 69909
+    },
+    "popup": {
+      "files": [
+        "chunks/popup-DQ5A0T6n.js",
+        "chunks/ui-vendor-CuyaPpbb.js",
+        "chunks/styles-DPDgEBeF.js"
+      ],
+      "bytes": 48950
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { LockKeyhole, ShieldCheck, KeyRound, Layers, ArrowUp, ArrowDown, Copy } from 'lucide-react';
 import { cookieKey, type CookieRecord } from '@cookie-loom/core';
 import { expiryLabel } from './shared';
@@ -30,6 +30,14 @@ export function CookieTable({
   onCopy: (cookie: CookieRecord) => void;
 }) {
   const selectAll = useRef<HTMLInputElement>(null);
+  const nameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const cookie of cookies) {
+      const key = JSON.stringify([cookie.domain, cookie.name]);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [cookies]);
   const selectedCount = cookies.filter((cookie) => selected.has(cookieKey(cookie))).length;
   useEffect(() => {
     if (selectAll.current)
@@ -98,10 +106,7 @@ export function CookieTable({
             ]
               .filter(Boolean)
               .join(' · ');
-            const ambiguous = cookies.some(
-              (other) =>
-                other !== cookie && other.name === cookie.name && other.domain === cookie.domain,
-            );
+            const ambiguous = nameCounts.get(JSON.stringify([cookie.domain, cookie.name]))! > 1;
             return (
               <tr key={key} className={focused === key ? 'focused' : ''}>
                 <td className="check-cell">

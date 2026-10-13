@@ -109,7 +109,7 @@ first-party isolation, and background lifecycle behavior. Its manifest also
 adds test-only host grants. Neither harness changes the production build.
 
 `bun run lint:firefox` runs the repository's reviewed validation wrapper. It
-rejects manifest errors and unexpected warnings. React DOM's two internal
+rejects manifest errors and unexpected warnings. Preact's one internal
 `innerHTML` warnings are accepted only in its isolated vendor chunk, while the
 script rejects HTML-injection sinks in application source. This is an explicit
 framework exception, not a claim that raw `web-ext lint` produces no warnings.
@@ -118,10 +118,22 @@ For manual extension checks, use a fresh browser profile and follow
 [the verification checklist](verification.md). Avoid loading test cookies into
 a personal or work profile. Tests must not contact real account services.
 
+`bun run benchmark:extension -- --output /tmp/loom-performance.json` measures
+the compiled Chromium extension with 2,000 synthetic native cookies, a disposable
+profile, one warmup, seven measured samples, and 4× CPU throttling on UI pages.
+The copied manifest has upfront test-only host grants; product code is unchanged.
+Close competing browser/build jobs first. Use `--build /path/to/build` to compare
+an older artifact. This benchmark is a diagnostic, not a timing gate in CI.
+See [the methodology and raw samples](extension-performance.md).
+
+`verify:builds` enforces explicit raw installed-size, total JavaScript, popup,
+and workbench startup budgets. Update a budget only with a measured, reviewed
+reason. Dynamic feature chunks count toward total JavaScript but not startup.
+
 ## Workspace layout
 
 ```text
-apps/extension/   React surfaces, browser adapter, WXT configuration, demo
+apps/extension/   Preact surfaces, browser adapter, WXT configuration, demo
 packages/core/    Cookie types and browser-independent rules
 docs/            Architecture, migration, verification, and releases
 legacy/          Original extension and historical store assets

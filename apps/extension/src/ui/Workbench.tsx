@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  cookieKey,
-  filterCookies,
-  groupCookiesByDomain,
-  type CookieRecord,
-} from '@cookie-loom/core';
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { cookieKey, filterCookies, type CookieRecord } from '@cookie-loom/core';
 import {
   Download,
   Upload,
@@ -28,10 +32,21 @@ import { useWorkspace } from './context';
 import { Sidebar, type View } from './Sidebar';
 import { Connect, copyText, ErrorNotice, hostOf, Modal } from './shared';
 import { CookieTable, type Sort } from './CookieTable';
-import { CookieEditor } from './Editor';
-import { TransferDialog } from './TransferDialog';
-import { Settings } from './Settings';
-import { CopyDialog } from './CopyDialog';
+const CookieEditor = lazy(() =>
+  import('./Editor').then((module) => ({ default: module.CookieEditor })),
+);
+const TransferDialog = lazy(() =>
+  import('./TransferDialog').then((module) => ({ default: module.TransferDialog })),
+);
+const Settings = lazy(() => import('./Settings').then((module) => ({ default: module.Settings })));
+const CopyDialog = lazy(() =>
+  import('./CopyDialog').then((module) => ({ default: module.CopyDialog })),
+);
+const pending = (
+  <p className="small muted" role="status">
+    Loading…
+  </p>
+);
 
 export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
   const {
@@ -41,6 +56,9 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
     gateway,
     status,
     loading,
+    refreshing,
+    domains: domainGroups,
+    cookieIndex,
     error,
     refresh,
     protect,
@@ -52,6 +70,13 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
   const [query, setQuery] = useState('');
   const [store, setStore] = useState('');
   const [siteOnly, setSiteOnly] = useState(false);
+  const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 840px)').matches);
+  useLayoutEffect(() => {
+    const media = window.matchMedia('(max-width: 840px)');
+    const change = () => setCompact(media.matches);
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
+  }, []);
   const [sort, setSort] = useState<Sort>({ field: 'domain', direction: 1 });
   const [focused, setFocused] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -84,7 +109,6 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
     () => new Set(preferences.protectedKeys),
     [preferences.protectedKeys],
   );
-  const domainGroups = useMemo(() => groupCookiesByDomain(cookies), [cookies]);
   const visible = useMemo(
     () =>
       filterCookies(cookies, query, {
@@ -112,9 +136,7 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
   );
   const pageCookies = visible.slice(page * 100, (page + 1) * 100);
   const chosen = visible.filter((cookie) => selected.has(cookieKey(cookie)));
-  const liveOriginal = focused
-    ? cookies.find((cookie) => cookieKey(cookie) === focused)
-    : undefined;
+  const liveOriginal = focused ? cookieIndex.get(focused) : undefined;
   // Retain the open draft after deletion, but never present this snapshot as a live cookie.
   const original = focused ? (liveOriginal ?? focusedCookie.current ?? undefined) : undefined;
   const missingFocused = Boolean(
@@ -278,7 +300,9 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
       <Sidebar view={view} domain={domain} onNavigate={changeView} />
       <main className="main-workspace">
         {view === 'settings' ? (
-          <Settings />
+          <Suspense fallback={pending}>
+            <Settings />
+          </Suspense>
         ) : (
           <>
             <header className="workbench-header">
@@ -367,19 +391,21 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                         </option>
                       ))}
                     </select>
-                    <select
-                      className="domain-select"
-                      aria-label="Filter by domain"
-                      value={domain}
-                      onChange={(event) => changeDomain(event.target.value)}
-                    >
-                      <option value="">All domains</option>
-                      {domainGroups.map((group) => (
-                        <option key={group.domain} value={group.domain}>
-                          {group.domain}
-                        </option>
-                      ))}
-                    </select>
+                    {compact && (
+                      <select
+                        className="domain-select"
+                        aria-label="Filter by domain"
+                        value={domain}
+                        onChange={(event) => changeDomain(event.target.value)}
+                      >
+                        <option value="">All domains</option>
+                        {domainGroups.map((group) => (
+                          <option key={group.domain} value={group.domain}>
+                            {group.domain}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     {hostOf(currentTab?.url) && (
                       <button
                         className={`button site-filter ${siteOnly ? 'selected' : ''}`}
@@ -397,9 +423,11 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                         className="icon-button bordered"
                         aria-label="Refresh cookies"
                         title="Refresh cookies"
+                        disabled={refreshing}
+                        aria-busy={refreshing}
                         onClick={() => void refresh()}
                       >
-                        <RefreshCw size={16} />
+                        <RefreshCw size={16} className={refreshing ? 'spin' : undefined} />
                       </button>
                       <button
                         className="icon-button bordered value-visibility"
@@ -604,29 +632,31 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
                   </footer>
                 </section>
                 {showEditor && (
-                  <CookieEditor
-                    key={original ? cookieKey(original) : `new-${editorVersion}`}
-                    original={original}
-                    missing={missingFocused}
-                    seed={original ?? cookieSeed}
-                    onClose={() => {
-                      setFocused(null);
-                      setCreating(false);
-                    }}
-                    onSaved={(cookie) => {
-                      focusedCookie.current = cookie;
-                      const savedKey = cookieKey(cookie);
-                      setPendingSavedKey(savedKey);
-                      setCreating(false);
-                      setFocused(savedKey);
-                      void refresh().finally(() => {
-                        setPendingSavedKey((current) => (current === savedKey ? null : current));
-                      });
-                    }}
-                    onDelete={setDeleting}
-                    onDirtyChange={onEditorDirty}
-                    onSavingChange={onEditorSaving}
-                  />
+                  <Suspense fallback={pending}>
+                    <CookieEditor
+                      key={original ? cookieKey(original) : `new-${editorVersion}`}
+                      original={original}
+                      missing={missingFocused}
+                      seed={original ?? cookieSeed}
+                      onClose={() => {
+                        setFocused(null);
+                        setCreating(false);
+                      }}
+                      onSaved={(cookie) => {
+                        focusedCookie.current = cookie;
+                        const savedKey = cookieKey(cookie);
+                        setPendingSavedKey(savedKey);
+                        setCreating(false);
+                        setFocused(savedKey);
+                        void refresh().finally(() => {
+                          setPendingSavedKey((current) => (current === savedKey ? null : current));
+                        });
+                      }}
+                      onDelete={setDeleting}
+                      onDirtyChange={onEditorDirty}
+                      onSavingChange={onEditorSaving}
+                    />
+                  </Suspense>
                 )}
               </div>
             )}
@@ -634,13 +664,19 @@ export function Workbench({ initialView = 'cookies' }: { initialView?: View }) {
         )}
       </main>
       {transfer && (
-        <TransferDialog
-          mode={transfer}
-          cookies={chosen.length ? chosen : visible}
-          onClose={() => setTransfer(null)}
-        />
+        <Suspense fallback={pending}>
+          <TransferDialog
+            mode={transfer}
+            cookies={chosen.length ? chosen : visible}
+            onClose={() => setTransfer(null)}
+          />
+        </Suspense>
       )}
-      {copying && <CopyDialog cookies={copying} onClose={() => setCopying(null)} />}
+      {copying && (
+        <Suspense fallback={pending}>
+          <CopyDialog cookies={copying} onClose={() => setCopying(null)} />
+        </Suspense>
+      )}
       {pendingNavigation && (
         <Modal title="Discard changes?" onClose={() => setPendingNavigation(null)}>
           <p>Your unsaved cookie edits will be lost.</p>

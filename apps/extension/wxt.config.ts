@@ -1,8 +1,9 @@
 import { defineConfig } from 'wxt';
 import { fileURLToPath } from 'node:url';
+import preact from '@preact/preset-vite';
 
 export default defineConfig({
-  modules: ['@wxt-dev/module-react'],
+  vite: () => ({ plugins: [preact({ devToolsEnabled: false })] }),
   manifestVersion: 3,
   zip: {
     name: 'cookie-loom',
@@ -27,7 +28,14 @@ export default defineConfig({
       'LICENSE',
       'NOTICE',
     ],
-    excludeSources: ['**/.output/**', '**/.wxt/**', '**/.env', '**/.env.*', '**/*.log'],
+    excludeSources: [
+      '**/.output/**',
+      '**/.wxt/**',
+      '**/.env',
+      '**/.env.*',
+      '**/*.log',
+      'docs/**/*.png',
+    ],
   },
   hooks: {
     'vite:build:extendConfig'(entrypoints, config) {
@@ -39,7 +47,7 @@ export default defineConfig({
       config.build.rollupOptions.output = {
         ...output,
         manualChunks(id) {
-          if (id.includes('/node_modules/react')) return 'react-vendor';
+          if (id.includes('/node_modules/preact/')) return 'ui-vendor';
         },
       };
     },
@@ -48,7 +56,7 @@ export default defineConfig({
     name: 'Cookie Loom',
     description:
       'Your cookies, untangled. A private cookie workbench with safe cleanup and portable backups.',
-    version: '0.1.0',
+    version: '0.1.1',
     homepage_url: 'https://github.com/q1/cookie-quick-manager',
     permissions: [
       'cookies',

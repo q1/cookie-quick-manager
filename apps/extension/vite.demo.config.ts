@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import preact from '@preact/preset-vite';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [preact({ devToolsEnabled: false })],
   server: { port: 5173, strictPort: true },
   define: { __LOOM_DEMO__: 'true' },
 });
