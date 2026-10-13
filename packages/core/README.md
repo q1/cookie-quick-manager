@@ -93,7 +93,8 @@ and [Chromium storage and cookies](https://developer.chrome.com/docs/extensions/
 
 ## Tests
 
-From the repository root, run `npm test`. The core suite covers isolation identity,
+With the repository's pinned Bun 1.4.3, run `bun run test` from the root.
+The native core suite covers isolation identity,
 scope, hostile paths, validation, search, JSON round trips, old exports, malformed
 input, size limits, and explicit loss warnings.
 

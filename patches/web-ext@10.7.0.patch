@@ -1,0 +1,64 @@
+diff --git a/lib/firefox/rdp-client.js b/lib/firefox/rdp-client.js
+index 163c1e9cbf21854a8a6c0bf7fa4558a9763d8228..832ad85f35664a9fd08f537211237142f4c2a617 100644
+--- a/lib/firefox/rdp-client.js
++++ b/lib/firefox/rdp-client.js
+@@ -1,6 +1,5 @@
+ import net from 'net';
+ import EventEmitter from 'events';
+-import domain from 'domain';
+ export const DEFAULT_PORT = 6000;
+ export const DEFAULT_HOST = '127.0.0.1';
+ const UNSOLICITED_EVENTS = new Set(['tabNavigated', 'styleApplied', 'propertyChange', 'networkEventUpdate', 'networkEvent', 'propertyChange', 'newMutations', 'frameUpdate', 'tabListChanged']);
+@@ -70,29 +69,29 @@ export default class FirefoxRDPClient extends EventEmitter {
+   }
+   connect(port) {
+     return new Promise((resolve, reject) => {
+-      // Create a domain to wrap the errors that may be triggered
+-      // by creating the client connection (e.g. ECONNREFUSED)
+-      // so that we can reject the promise returned instead of
+-      // exiting the entire process.
+-      const d = domain.create();
+-      d.once('error', reject);
+-      d.run(() => {
+-        const conn = net.createConnection({
+-          port,
+-          host: DEFAULT_HOST
+-        });
+-        this._rdpConnection = conn;
+-        conn.on('data', this._onData);
+-        conn.on('error', this._onError);
+-        conn.on('end', this._onEnd);
+-        conn.on('timeout', this._onTimeout);
+-
+-        // Resolve once the expected initial root message
+-        // has been received.
+-        this._expectReply('root', {
+-          resolve,
+-          reject
+-        });
++      // Handle startup connection errors explicitly. Bun does not forward socket
++      // errors through Node's deprecated domain API. Rejecting here preserves
++      // web-ext's normal ECONNREFUSED retry path on both runtimes.
++      const onConnectionError = error => {
++        reject(error);
++        this.disconnect();
++      };
++      this.once('error', onConnectionError);
++      const conn = net.createConnection({ port, host: DEFAULT_HOST });
++      this._rdpConnection = conn;
++      conn.on('data', this._onData);
++      conn.on('error', this._onError);
++      conn.on('end', this._onEnd);
++      conn.on('timeout', this._onTimeout);
++      this._expectReply('root', {
++        resolve: value => {
++          this.off('error', onConnectionError);
++          resolve(value);
++        },
++        reject: error => {
++          this.off('error', onConnectionError);
++          reject(error);
++        }
+       });
+     });
+   }

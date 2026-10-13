@@ -6,7 +6,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const publicDirectory = resolve(root, 'apps/extension/public');
 await mkdir(publicDirectory, { recursive: true });
 let notices =
-  '# Third-party notices\n\nThese notices cover code bundled in the Cookie Loom extension. Development tools\nretain their licenses in their installed packages. Update this file with\n`npm run prepare:assets` after dependency changes.\n\n';
+  '# Third-party notices\n\nThese notices cover code bundled in the Cookie Loom extension. Development tools\nretain their licenses in their installed packages. Update this file with\n`bun run prepare:assets` after dependency changes.\n\n';
 for (const name of ['react', 'react-dom', 'scheduler', 'lucide-react', 'wxt', '@wxt-dev/browser']) {
   const directory = resolve(root, 'node_modules', name);
   const metadata = JSON.parse(await readFile(resolve(directory, 'package.json'), 'utf8'));

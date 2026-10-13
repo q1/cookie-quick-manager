@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'bun:test';
 import { cookieDomain, cookieKey, domainMatches, type CookieRecord } from '@cookie-loom/core';
 import { createGateway, registerBackground, type BrowserApi } from './gateway';
 import { HOST_PERMISSIONS } from './types';
@@ -35,6 +35,27 @@ function cookie(overrides: Partial<CookieRecord> = {}): CookieRecord {
     storeId: '0',
     ...overrides,
   };
+}
+
+/** Preserve mock types after the browser-API fixture's structural cast. */
+function mocked<T extends (...args: never[]) => unknown>(fn: T): Mock<T> {
+  return fn as unknown as Mock<T>;
+}
+
+function withGlobals(values: Record<string, unknown>, body: () => void) {
+  const originals = Object.keys(values).map(
+    (name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const,
+  );
+  try {
+    for (const [name, value] of Object.entries(values))
+      Object.defineProperty(globalThis, name, { configurable: true, writable: true, value });
+    body();
+  } finally {
+    for (const [name, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else Reflect.deleteProperty(globalThis, name);
+    }
+  }
 }
 
 function fixture(initial: CookieRecord[] = [], firefox = false) {
@@ -394,8 +415,8 @@ describe('browser gateway', () => {
     const domain = cookie({ domain: '.example.com', hostOnly: false, storeId: 'firefox-default' });
     const host = cookie({ storeId: 'firefox-default', value: 'host-old' });
     const f = fixture([domain, host], true);
-    const nativeSet = vi.mocked(f.api.cookies.set).getMockImplementation()!;
-    vi.mocked(f.api.cookies.set).mockImplementation(async (details) => {
+    const nativeSet = mocked(f.api.cookies.set).getMockImplementation()!;
+    mocked(f.api.cookies.set).mockImplementation(async (details) => {
       await nativeSet(details);
       return { ...domain, firstPartyDomain: '' };
     });
@@ -408,8 +429,8 @@ describe('browser gateway', () => {
   it('returns a newly created host cookie instead of the sibling returned by Firefox set', async () => {
     const domain = cookie({ domain: '.example.com', hostOnly: false, storeId: 'firefox-default' });
     const f = fixture([domain], true);
-    const nativeSet = vi.mocked(f.api.cookies.set).getMockImplementation()!;
-    vi.mocked(f.api.cookies.set).mockImplementation(async (details) => {
+    const nativeSet = mocked(f.api.cookies.set).getMockImplementation()!;
+    mocked(f.api.cookies.set).mockImplementation(async (details) => {
       await nativeSet(details);
       return { ...domain, firstPartyDomain: '' };
     });
@@ -423,7 +444,7 @@ describe('browser gateway', () => {
 
   it('reports an unverifiable write without deleting an unverified cookie', async () => {
     const f = fixture();
-    vi.mocked(f.api.cookies.getAll).mockResolvedValue([]);
+    mocked(f.api.cookies.getAll).mockResolvedValue([]);
     await expect(f.gateway.saveCookie(cookie())).rejects.toThrow('write could not be verified');
     expect(f.cookies()).toHaveLength(1);
     expect(f.api.cookies.remove).not.toHaveBeenCalled();
@@ -432,7 +453,7 @@ describe('browser gateway', () => {
   it('does not accept a null set result for an attribute-only edit', async () => {
     const original = cookie();
     const f = fixture([original]);
-    vi.mocked(f.api.cookies.set).mockResolvedValue(null);
+    mocked(f.api.cookies.set).mockResolvedValue(null);
     await expect(f.gateway.saveCookie({ ...original, secure: false }, original)).rejects.toThrow(
       'The browser rejected this cookie',
     );
@@ -443,7 +464,7 @@ describe('browser gateway', () => {
   it('verifies semantic attributes after set rather than only the unchanged value', async () => {
     const original = cookie();
     const f = fixture([original]);
-    vi.mocked(f.api.cookies.set).mockResolvedValue(original);
+    mocked(f.api.cookies.set).mockResolvedValue(original);
     await expect(f.gateway.saveCookie({ ...original, httpOnly: false }, original)).rejects.toThrow(
       'write could not be verified',
     );
@@ -454,8 +475,8 @@ describe('browser gateway', () => {
   it('rolls back a rename if the original can no longer be removed safely', async () => {
     const original = cookie();
     const f = fixture([original]);
-    const originalRemove = vi.mocked(f.api.cookies.remove).getMockImplementation()!;
-    vi.mocked(f.api.cookies.remove).mockImplementation(async (details) => {
+    const originalRemove = mocked(f.api.cookies.remove).getMockImplementation()!;
+    mocked(f.api.cookies.remove).mockImplementation(async (details) => {
       if (details.name === 'session') throw new Error('browser failure');
       // fixture removal implementation is retained below for the new cookie.
       return originalRemove(details);
@@ -468,7 +489,7 @@ describe('browser gateway', () => {
 
   it('never exposes browser write errors containing cookie values', async () => {
     const f = fixture();
-    vi.mocked(f.api.cookies.set).mockRejectedValue(new Error('Cookie fake-value rejected'));
+    mocked(f.api.cookies.set).mockRejectedValue(new Error('Cookie fake-value rejected'));
     await expect(f.gateway.saveCookie(cookie())).rejects.toThrow(
       'The browser rejected this cookie',
     );
@@ -501,8 +522,8 @@ describe('browser gateway', () => {
 
   it('rolls back instead of silently discarding a partition ancestor bit', async () => {
     const f = fixture([], true);
-    const nativeSet = vi.mocked(f.api.cookies.set).getMockImplementation()!;
-    vi.mocked(f.api.cookies.set).mockImplementation(async (details) => {
+    const nativeSet = mocked(f.api.cookies.set).getMockImplementation()!;
+    mocked(f.api.cookies.set).mockImplementation(async (details) => {
       const partition = details.partitionKey as CookieRecord['partitionKey'];
       return nativeSet({ ...details, partitionKey: { topLevelSite: partition?.topLevelSite } });
     });
@@ -522,8 +543,8 @@ describe('browser gateway', () => {
       partitionKey: { topLevelSite: 'https://first.example' },
     });
     const f = fixture([original], true);
-    const nativeSet = vi.mocked(f.api.cookies.set).getMockImplementation()!;
-    vi.mocked(f.api.cookies.set).mockImplementation(async (details) => {
+    const nativeSet = mocked(f.api.cookies.set).getMockImplementation()!;
+    mocked(f.api.cookies.set).mockImplementation(async (details) => {
       const partition = details.partitionKey as CookieRecord['partitionKey'];
       return nativeSet({ ...details, partitionKey: { topLevelSite: partition?.topLevelSite } });
     });
@@ -554,7 +575,7 @@ describe('browser gateway', () => {
 
   it('does not inject after a scripting permission denial', async () => {
     const f = fixture();
-    vi.mocked(f.api.permissions.request).mockResolvedValue(false);
+    mocked(f.api.permissions.request).mockResolvedValue(false);
     await expect(f.gateway.clearCurrentTabLocalStorage()).rejects.toThrow('Scripting access');
     expect(f.api.scripting!.executeScript).not.toHaveBeenCalled();
   });
@@ -563,35 +584,34 @@ describe('browser gateway', () => {
     const f = fixture();
     const clear = vi.fn();
     await f.gateway.clearCurrentTabLocalStorage();
-    const details = vi.mocked(f.api.scripting!.executeScript).mock.calls[0]![0];
-    vi.stubGlobal('location', { origin: 'https://navigated.example' });
-    vi.stubGlobal('localStorage', { clear });
-    try {
+    const details = mocked(f.api.scripting!.executeScript).mock.calls[0]![0];
+    const location = { origin: 'https://navigated.example' };
+    withGlobals({ location, localStorage: { clear } }, () => {
       expect(details.func(details.args[0])).toEqual({ cleared: false });
       expect(clear).not.toHaveBeenCalled();
-      vi.stubGlobal('location', { origin: 'https://example.com' });
+      location.origin = 'https://example.com';
       expect(details.func(details.args[0])).toEqual({ cleared: true });
-      expect(clear).toHaveBeenCalledOnce();
-    } finally {
-      vi.unstubAllGlobals();
-    }
+      expect(clear).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('does not acknowledge a local-storage SecurityError inside the injected function', async () => {
     const f = fixture();
     await f.gateway.clearCurrentTabLocalStorage();
-    const details = vi.mocked(f.api.scripting!.executeScript).mock.calls[0]![0];
-    vi.stubGlobal('location', { origin: 'https://example.com' });
-    vi.stubGlobal('localStorage', {
-      clear: () => {
-        throw new DOMException('Storage access denied', 'SecurityError');
+    const details = mocked(f.api.scripting!.executeScript).mock.calls[0]![0];
+    withGlobals(
+      {
+        location: { origin: 'https://example.com' },
+        localStorage: {
+          clear: () => {
+            throw new DOMException('Storage access denied', 'SecurityError');
+          },
+        },
       },
-    });
-    try {
-      expect(details.func(details.args[0])).toEqual({ cleared: false });
-    } finally {
-      vi.unstubAllGlobals();
-    }
+      () => {
+        expect(details.func(details.args[0])).toEqual({ cleared: false });
+      },
+    );
   });
 
   it.each([
@@ -602,7 +622,7 @@ describe('browser gateway', () => {
     ['an acknowledgement from another frame', [{ frameId: 1, result: { cleared: true } }]],
   ])('does not report local storage cleared for %s', async (_name, results) => {
     const f = fixture();
-    vi.mocked(f.api.scripting!.executeScript).mockResolvedValue(results);
+    mocked(f.api.scripting!.executeScript).mockResolvedValue(results);
     await expect(f.gateway.clearCurrentTabLocalStorage()).rejects.toThrow(
       'local storage could not be cleared',
     );
@@ -610,10 +630,10 @@ describe('browser gateway', () => {
 
   it('resolves a Chromium private tab to its actual cookie store', async () => {
     const f = fixture();
-    vi.mocked(f.api.tabs.query).mockResolvedValue([
+    mocked(f.api.tabs.query).mockResolvedValue([
       { id: 12, url: 'https://example.com/', incognito: true },
     ]);
-    vi.mocked(f.api.cookies.getAllCookieStores).mockResolvedValue([
+    mocked(f.api.cookies.getAllCookieStores).mockResolvedValue([
       { id: '0', tabIds: [1] },
       { id: '1', tabIds: [12] },
     ]);
@@ -653,21 +673,21 @@ describe('browser gateway', () => {
     const page = createGateway(f.api, { useActiveTab: false });
     expect(await page.getCurrentTab()).toBeNull();
     const closedSource = createGateway(f.api, { sourceTabId: 42 });
-    vi.mocked(f.api.tabs.get).mockRejectedValue(new Error('No tab'));
+    mocked(f.api.tabs.get).mockRejectedValue(new Error('No tab'));
     expect(await closedSource.getCurrentTab()).toBeNull();
   });
 
   it('refuses to clear a captured source tab after it navigates to another origin', async () => {
     const f = fixture();
     const page = createGateway(f.api, { sourceTabId: 1, sourceOrigin: 'https://example.com' });
-    vi.mocked(f.api.tabs.get).mockResolvedValue({ id: 1, url: 'https://another.example/' });
+    mocked(f.api.tabs.get).mockResolvedValue({ id: 1, url: 'https://another.example/' });
     await expect(page.clearCurrentTabLocalStorage()).rejects.toThrow('website tab');
     expect(f.api.scripting!.executeScript).not.toHaveBeenCalled();
   });
 
   it('does not inject anything when the active page is not a website', async () => {
     const f = fixture();
-    vi.mocked(f.api.tabs.query).mockResolvedValue([{ id: 1, url: 'about:preferences' }]);
+    mocked(f.api.tabs.query).mockResolvedValue([{ id: 1, url: 'about:preferences' }]);
     await expect(f.gateway.clearCurrentTabLocalStorage()).rejects.toThrow('website tab');
     expect(f.api.scripting!.executeScript).not.toHaveBeenCalled();
   });
@@ -677,10 +697,10 @@ describe('browser gateway', () => {
     const listener = vi.fn();
     const unsubscribe = f.gateway.subscribe(listener);
     await f.changed.fire({});
-    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledTimes(1);
     unsubscribe();
     await f.changed.fire({});
-    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });
 

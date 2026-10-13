@@ -2,6 +2,6 @@ legacy/
 node_modules/
 **/.output/
 **/.wxt/
-package-lock.json
+bun.lock
 playwright-report/
 test-results/

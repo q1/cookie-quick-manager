@@ -4,9 +4,10 @@ Cookie Loom is one extension with two browser builds. The popup handles quick
 current-site tasks; the workbench provides space for inspection, editing,
 search, transfers, and settings. Both use the same cookie model and services.
 
-## Decision: TypeScript, React, WXT, npm workspaces
+## Decision: TypeScript, React, WXT, Bun workspaces
 
-**Status:** accepted for the rewrite, 2026-10-08.
+**Status:** workspace split accepted for the rewrite on 2026-10-08; toolchain
+migrated to Bun 1.4.3 on 2026-10-12.
 
 - `apps/extension` owns the React interface, extension entrypoints, browser
   adapter, manifests, assets, and synthetic-data demo.
@@ -14,17 +15,26 @@ search, transfers, and settings. Both use the same cookie model and services.
   cleanup selection, and browser-independent behavior.
 - WXT builds Manifest V3 packages for Chromium and Firefox from shared source.
   Browser-specific configuration and capability differences stay explicit.
-- npm workspaces provide a single lockfile. TypeScript, linting, unit tests,
-  and browser tests are run from the repository root.
+- Bun workspaces provide a single `bun.lock`, frozen scripts-disabled installs,
+  native typechecking, and parallel unit tests. Validation, browser tests, and
+  packaging run under the same pinned runtime from the repository root.
 - `legacy/` preserves the previous JavaScript / jQuery extension and store
   material. It is excluded from new application builds and active checks.
 
 This split makes destructive behavior testable without a browser while keeping
 browser permissions and API differences visible at their boundary. React
 provides a common accessible component model; WXT handles extension entrypoints
-and build packaging. The tradeoff is a Node-based build pipeline and a larger
-dependency set than the original handwritten extension. The lockfile and
+and build packaging. Bun runs WXT/Vite and the maintenance scripts; the shipped
+extension uses each browser's JavaScript engine. The tradeoff is a build pipeline
+and dependency set larger than the original handwritten extension. The lockfile and
 source-build instructions are part of the reviewable release input.
+
+TypeScript remains the application language and supplies editor/tool library
+types. Bun's native checker validates the extension, core, and tooling projects in parallel without
+emitting browser code. Native Bun tests replace Vitest; Playwright and the
+Firefox harness verify compiled browser behavior. `run.noOrphans` also keeps
+development child processes tied to their supervisor. See
+[development details](development.md) and [toolchain measurements](toolchain-performance.md).
 
 ## Cookie identity
 

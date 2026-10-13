@@ -5,41 +5,51 @@
   "description": "A local-first cookie workbench for Firefox and Chromium.",
   "license": "GPL-3.0-or-later",
   "type": "module",
+  "packageManager": "bun@1.4.3",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "engines": {
-    "node": ">=24"
+    "bun": "1.4.3"
   },
   "scripts": {
-    "dev": "npm run dev:demo -w @cookie-loom/extension",
-    "dev:chrome": "npm run dev:chrome -w @cookie-loom/extension",
-    "dev:firefox": "npm run dev:firefox -w @cookie-loom/extension",
-    "build": "npm run build -w @cookie-loom/extension",
-    "zip": "wxt zip apps/extension -b chrome --mv3 && wxt zip apps/extension -b firefox --mv3",
-    "check": "npm run typecheck -w @cookie-loom/extension && tsc -p packages/core/tsconfig.json --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "dev": "bun run --filter @cookie-loom/extension dev:demo",
+    "dev:chrome": "bun run --filter @cookie-loom/extension dev:chrome",
+    "dev:firefox": "bun run --filter @cookie-loom/extension dev:firefox",
+    "build": "bun run toolchain:check && bun run prepare:assets && bun run --filter @cookie-loom/extension build",
+    "zip": "bun run toolchain:check && bun run prepare:assets && wxt zip apps/extension -b chrome --mv3 && wxt zip apps/extension -b firefox --mv3",
+    "toolchain:check": "bun scripts/check-toolchain.mjs",
+    "typecheck": "bun run toolchain:check && bun run --parallel typecheck:extension typecheck:core typecheck:tooling",
+    "typecheck:extension": "bun run --filter @cookie-loom/extension typecheck",
+    "typecheck:core": "bun check -p packages/core",
+    "typecheck:tooling": "bun check -p tests/tooling",
+    "test": "bun test --parallel=4",
+    "test:watch": "bun test --watch",
     "test:e2e": "playwright test",
-    "lint:firefox": "npm run lint:firefox -w @cookie-loom/extension",
+    "lint:firefox": "bun scripts/lint-firefox.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:firefox": "node tests/firefox/run.mjs",
-    "verify:builds": "node scripts/verify-builds.mjs",
-    "prepare:assets": "node scripts/prepare-assets.mjs",
-    "prebuild": "npm run prepare:assets",
-    "prezip": "npm run prepare:assets"
+    "test:firefox": "bun tests/firefox/run.mjs",
+    "verify:builds": "bun scripts/verify-builds.mjs",
+    "verify:sources": "bun scripts/verify-sources.mjs",
+    "release:prepare": "bun scripts/prepare-release.mjs",
+    "prepare:assets": "bun scripts/prepare-assets.mjs",
+    "prepare:store": "bun scripts/prepare-store-assets.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.61.0",
+    "@types/bun": "1.4.3",
     "@types/node": "24.10.1",
     "prettier": "3.9.9",
-    "typescript": "5.9.3",
-    "vitest": "5.0.3"
+    "typescript": "5.9.3"
   },
+  "trustedDependencies": [],
   "overrides": {
     "web-ext": "10.7.0",
     "shell-quote": "1.12.0"
+  },
+  "patchedDependencies": {
+    "web-ext@10.7.0": "patches/web-ext@10.7.0.patch"
   }
 }

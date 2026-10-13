@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "bun"]
   },
   "include": ["**/*.ts", "**/*.tsx", ".wxt/**/*.ts"]
 }

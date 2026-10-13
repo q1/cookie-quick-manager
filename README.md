@@ -9,8 +9,10 @@ new TypeScript / React codebase and shared Chromium and Firefox builds. It
 continues under GPL-3.0-or-later and retains the original project's history and
 attribution. See [NOTICE](NOTICE) and [the migration guide](docs/migration.md).
 
-**Status: 0.1.0 development preview.** Build and load it locally using the
-instructions below. No Cookie Loom browser-store release is claimed here.
+**Status: 0.1.0 public preview.** Download the unsigned browser ZIPs, reproducible
+source, and checksums from [the preview release](https://github.com/q1/cookie-quick-manager/releases/tag/v0.1.0-preview.1).
+Chromium can load the extracted build unpacked; Firefox supports a temporary
+development installation. No Cookie Loom browser-store release is claimed here.
 Targets are desktop Chromium 132+ and Firefox 140+; browser-specific behavior
 must be verified on the versions you use. Safari and mobile are not current
 release targets.
@@ -64,11 +66,11 @@ search syntax, cleanup scope, and import behavior.
 
 ## Try the demo
 
-Use Node.js 24 and npm:
+Use [Bun 1.4.3](https://bun.sh/blog/bun-v1.4.3), pinned in `.bun-version`:
 
 ```sh
-npm ci
-npm run dev
+bun install --frozen-lockfile --ignore-scripts
+bun run dev
 ```
 
 Open the local URL printed by Vite, normally `http://localhost:5173`.
@@ -78,7 +80,7 @@ store. It is useful for exploring the interface, not verifying extension APIs.
 ## Build the extension
 
 ```sh
-npm run build
+bun run build
 ```
 
 **Chromium:** open `chrome://extensions`, enable **Developer mode**, select
@@ -90,23 +92,23 @@ This is a temporary development installation; normal distribution requires
 [Mozilla signing](https://extensionworkshop.com/documentation/publish/signing-and-distribution-overview/).
 
 Use a disposable browser profile for development. To run WXT's development
-workflow directly, use `npm run dev:chrome` or `npm run dev:firefox`.
+workflow directly, use `bun run dev:chrome` or `bun run dev:firefox`.
 
 ## Develop and contribute
 
 ```sh
-npm run format:check
-npm audit --omit=dev
-npm run check
-npm test
-npm run build
-npm run lint:firefox
-npx playwright install chromium firefox
-npm run test:e2e
-npm run test:firefox
+bun run format:check
+bun audit --prod
+bun run typecheck
+bun run test
+bun run build
+bun run lint:firefox
+bunx --bun playwright install chromium firefox
+bun run test:e2e
+bun run test:firefox
 ```
 
-The npm workspace contains:
+The Bun workspace contains:
 
 ```text
 apps/extension/   WXT extension, React interface, browser adapter, local demo
@@ -120,7 +122,12 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md),
 [architecture decisions](docs/architecture.md). See
 [browser verification](docs/verification.md) for real-extension checks and
 [the release guide](docs/releasing.md) for packaging and store preparation.
-`npm run zip` creates unsigned browser-specific archives for review.
+Native Bun typechecking and parallel unit tests keep feedback quick; measured
+toolchain results are recorded in [the performance notes](docs/toolchain-performance.md).
+`bun run zip` creates unsigned browser-specific archives for review.
+`bun run verify:sources` rebuilds from the source archive and compares every
+browser ZIP file with the production build. Store copy, permission explanations,
+images, and reviewer instructions are in [the submission kit](docs/store-listing.md).
 
 See the [dependency review](docs/dependency-review.md) for the remaining
 development-tool advisories; the production dependency audit is clean.

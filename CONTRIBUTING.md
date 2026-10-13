@@ -11,6 +11,10 @@ without weakening the user's control over their browser data.
 3. Open a focused issue or pull request. Discuss substantial permission,
    storage, dependency, or product changes before implementing them.
 
+Use Bun 1.4.3 and install with `bun install --frozen-lockfile --ignore-scripts`.
+Dependency changes must include the updated `bun.lock`; keep the single workspace
+lockfile rather than introducing another package manager's lockfile.
+
 Bug reports should include the browser and version, operating system, steps
 to reproduce, expected behavior, and what happened. Use a disposable profile
 and synthetic cookies whenever possible. Never attach real session tokens,
@@ -40,16 +44,17 @@ Please also read the [code of conduct](CODE_OF_CONDUCT.md).
 Before opening a pull request, run:
 
 ```sh
-npm run format:check
-npm audit --omit=dev
-npm run check
-npm test
-npm run build
-npm run lint:firefox
-npm run test:e2e
-npm run test:firefox
-npm run zip
-npm run verify:builds
+bun run format:check
+bun audit --prod
+bun run typecheck
+bun run test
+bun run build
+bun run lint:firefox
+bun run test:e2e
+bun run test:firefox
+bun run zip
+bun run verify:builds
+bun run verify:sources
 ```
 
 The browser tests require Playwright's Chromium and Firefox installations; see the

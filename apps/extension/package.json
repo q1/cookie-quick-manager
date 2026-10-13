@@ -9,9 +9,9 @@
     "dev:chrome": "wxt -b chrome --mv3",
     "dev:firefox": "wxt -b firefox --mv3",
     "build": "wxt build -b chrome --mv3 && wxt build -b firefox --mv3",
-    "zip": "npm --prefix ../.. run zip",
-    "typecheck": "wxt prepare && tsc --noEmit",
-    "lint:firefox": "node ../../scripts/lint-firefox.mjs"
+    "zip": "bun run --cwd ../.. zip",
+    "typecheck": "wxt prepare && bun check -p tsconfig.json",
+    "lint:firefox": "bun ../../scripts/lint-firefox.mjs"
   },
   "dependencies": {
     "@cookie-loom/core": "*",

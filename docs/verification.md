@@ -7,7 +7,7 @@ a release. Automated demo tests are useful but do not replace these checks.
 
 ## Automated coverage and limits
 
-`npm run test:e2e` runs the demo workflows in desktop Chromium and Firefox,
+`bun run test:e2e` runs the demo workflows in desktop Chromium and Firefox,
 plus 320-, 390-, 768-, 1024-, and 1440-pixel layout checks. It covers CRUD, hidden values, search and
 store filtering, protected cleanup and undo, import preview and isolation
 safeguards, file export, copy-to-store, value conversion, keyboard dialogs,
@@ -18,7 +18,7 @@ to check its no-host-access state, then uses a disposable copy with test-only
 host grants for real cookie operations. No cookie API mocks are used in those
 native extension checks.
 
-`npm run test:firefox` exercises Firefox's native cookie, store, container,
+`bun run test:firefox` exercises Firefox's native cookie, store, container,
 partition, first-party isolation, and background lifecycle APIs in a disposable
 profile. Its temporary artifact also adds test-only host grants and a fixture
 page that exercises the unchanged production background's mutation coordinator.
@@ -54,9 +54,27 @@ lockfile with `npm ci --ignore-scripts`, and `npm run build` reproduced all 22
 files in each browser build byte for byte. The source archive includes the
 shared core package and root build scripts; see the [release guide](releasing.md).
 
-These are local development results, not store review or a compatibility
-certification. Minimum-version browsers, native permission dialogs, signed
-installation/update paths, and mobile browsers still need separate verification.
+On 2026-10-12, release preparation also passed the three compiled-extension
+workflows on official Chrome for Testing 132.0.6834.159 and all 13 native checks
+on official Firefox 140.0 (build ID 20250616215311), using disposable profiles on
+Ubuntu x86_64. Production background/manifest hashes matched the earlier record.
+CI now repeats these minimum-browser checks using version-pinned official
+downloads with SHA-256 verification. This covers APIs and the Chromium workbench,
+not every UI interaction on both minimum versions.
+
+The Bun 1.4.3 migration retained all 144 cookie tests and adds two socket-level
+web-ext startup regressions: 146 native tests across five files. All 57 browser
+tests, the three Chrome 132 workflows, and the 13 native checks on each of
+Firefox 140 and 151 passed with Bun running the tooling. The new checker and
+the retained editor TypeScript compiler both passed the extension/core projects.
+The [performance record](toolchain-performance.md) reports measured development
+latency; it makes no claim about JavaScript speed inside the browser extension.
+
+These results are not store review or a compatibility certification. Native
+permission dialogs, signed installation/update paths, real private-window UI,
+and mobile browsers still need separate verification. Mobile is not a release
+target. The release pipeline separately rebuilds source and compares every
+packaged file rather than treating ZIP integrity as proof of reproducibility.
 
 ## Permissions and navigation
 

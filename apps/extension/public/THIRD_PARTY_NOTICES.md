@@ -2,7 +2,7 @@
 
 These notices cover code bundled in the Cookie Loom extension. Development tools
 retain their licenses in their installed packages. Update this file with
-`npm run prepare:assets` after dependency changes.
+`bun run prepare:assets` after dependency changes.
 
 ## react 19.3.0
 
