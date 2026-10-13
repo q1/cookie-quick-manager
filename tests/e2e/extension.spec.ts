@@ -8,11 +8,13 @@ const buildDirectory = path.resolve('apps/extension/.output/chrome-mv3');
 async function launchExtension(directory: string) {
   await access(path.join(directory, 'manifest.json')).catch(() => {
     throw new Error(
-      'Build the browser artifacts with npm run build before running extension tests.',
+      'Build the browser artifacts with bun run build before running extension tests.',
     );
   });
   const context = await chromium.launchPersistentContext('', {
-    channel: 'chromium',
+    ...(process.env.CHROMIUM_BINARY
+      ? { executablePath: process.env.CHROMIUM_BINARY }
+      : { channel: 'chromium' }),
     headless: true,
     viewport: { width: 1440, height: 1000 },
     args: [`--disable-extensions-except=${directory}`, `--load-extension=${directory}`],

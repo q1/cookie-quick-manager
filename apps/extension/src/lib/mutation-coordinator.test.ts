@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'bun:test';
 import { createDemoGateway } from './demo-gateway';
 import { registerMutationCoordinator, type MutationRuntime } from './mutation-coordinator';
 
@@ -79,7 +79,11 @@ describe('mutation message boundary', () => {
     'keeps a callback-only runtime channel open for %s requests without returning a promise',
     async (kind) => {
       const f = fixture();
-      const respond = vi.fn();
+      let finish!: () => void;
+      const completed = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const respond = vi.fn((_response: unknown) => finish());
       const message =
         kind === 'invalid'
           ? { channel: f.request.channel, operation: { kind: 'unknown' } }
@@ -87,7 +91,8 @@ describe('mutation message boundary', () => {
       const sender = kind === 'untrusted' ? { id: 'test', url: 'https://site.example/' } : f.sender;
       const handled = f.dispatch(message, sender, respond);
       expect(handled).toBe(true);
-      await vi.waitFor(() => expect(respond).toHaveBeenCalledOnce());
+      await completed;
+      expect(respond).toHaveBeenCalledTimes(1);
       expect(respond.mock.calls[0]![0]).toMatchObject({ ok: kind === 'valid' });
     },
   );
@@ -119,6 +124,6 @@ describe('mutation message boundary', () => {
   it('removes the runtime listener on disposal', () => {
     const f = fixture();
     f.coordinator.dispose();
-    expect(f.dispose).toHaveBeenCalledOnce();
+    expect(f.dispose).toHaveBeenCalledTimes(1);
   });
 });

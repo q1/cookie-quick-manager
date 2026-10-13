@@ -161,6 +161,7 @@ function checkBundledCode(files, requireResource, platform) {
     [/\b(?:createDemoGateway|demoCookies|DEMO_STORES)\b/, 'demo gateway code'],
     [/\b(?:window\.vAPI|vAPI\.templates|window\.jQuery)\b/, 'legacy extension code'],
     [/(?:@playwright\/test|@testing-library\/|["'`]vitest["'`])/, 'test framework code'],
+    [/(?:["'`]bun:|\bBun\.)/, 'Bun-only runtime or test code'],
     [/(?:^|[\s/"'`])node_modules\//, 'unbundled node_modules path'],
     [
       /(?:@vite\/client|@react-refresh|react-refresh\/|__vite_plugin_react_preamble_installed__|import\.meta\.hot|__WXT_DEV_SERVER)/,
@@ -224,7 +225,7 @@ async function verify(platform) {
   const directory = resolve(output, `${platform}-mv3`);
   check(
     (await lstat(directory).catch(() => null))?.isDirectory(),
-    `Missing ${platform} production build. Run npm run build first.`,
+    `Missing ${platform} production build. Run bun run build first.`,
   );
   const files = await inventory(directory);
   check(files.has('manifest.json'), `${platform}: manifest.json is missing.`);
@@ -346,7 +347,7 @@ async function verify(platform) {
     const original = await readFile(resolve(root, file));
     check(
       files.get(file).equals(original),
-      `${platform}: bundled ${file} is stale. Run npm run prepare:assets and rebuild.`,
+      `${platform}: bundled ${file} is stale. Run bun run prepare:assets and rebuild.`,
     );
   }
   requireResource('icon.svg', 'product icon');

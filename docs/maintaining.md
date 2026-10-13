@@ -30,7 +30,8 @@ Maintain these repository settings:
   Use this project's own store URLs once published.
 - Protect the default branch against force pushes and deletion. Once CI has
   run, require **Checks, builds, and packages** and **Browser tests** before
-  merging. Set review requirements to match the number of active maintainers;
+  merging. Also retain **Minimum browser versions** once its first run passes.
+  Set review requirements to match the number of active maintainers;
   do not require an independent approval when only one maintainer can provide it.
 - Keep automatic deletion of merged topic branches enabled. Keep release permissions narrow and store
   signing credentials outside the repository.
@@ -54,10 +55,17 @@ Review dependency changes with the lockfile and
 known development-tool advisories still require explicit review and follow-up.
 Do not suppress an audit finding solely to make the status green.
 
+Keep `.bun-version`, `packageManager`, the Bun engine pin, and CI in sync.
+Review `bun.lock` on dependency changes and use frozen installs with lifecycle
+scripts disabled. The native `bun check` command owns that name, so maintain the
+root `typecheck` script for project-wide checks. Recheck WXT/Vite, the native unit
+suite, browser fixtures, and byte-for-byte source rebuilds before a Bun upgrade.
+
 CodeRabbit inherits the existing organization settings and excludes the archived
 `legacy/` tree from automated review. Maintained code and documentation stay in
 scope. Service capacity limits can still skip its review; the required CI checks
 and maintainer review remain necessary.
 
-Use [the release guide](releasing.md) to promote reviewed artifacts. Signing,
-GitHub releases, and store publication remain deliberate maintainer actions.
+Use [the release guide](releasing.md) to promote reviewed artifacts. Publishing
+an annotated preview tag deliberately triggers GitHub release automation after
+verification; signing and store publication remain separate publisher actions.

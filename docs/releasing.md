@@ -14,22 +14,24 @@ or signing keys. A local zip is an unsigned build, not a published release.
 4. Confirm the repository links, publisher identity, product name, and Firefox
    add-on ID are owned by this project and separate from upstream. Keep the
    add-on ID stable after publication. Never reuse upstream signing material.
-5. Build from a clean checkout using the declared Node version and committed
-   lockfile:
+5. Build from a clean checkout using Bun 1.4.3 from `.bun-version` and the
+   committed `bun.lock`:
 
    ```sh
-   npm ci
-   npm run format:check
-   npm audit --omit=dev
-   npm run check
-   npm test
-   npm run build
-   npm run lint:firefox
-   npx playwright install chromium firefox
-   npm run test:e2e
-   npm run test:firefox
-   npm run zip
-   npm run verify:builds
+   bun install --frozen-lockfile --ignore-scripts
+   bun run format:check
+   bun audit --prod
+   bun run typecheck
+   bun run test
+   bun run build
+   bun run lint:firefox
+   bunx --bun playwright install chromium firefox
+   bun run test:e2e
+   bun run test:firefox
+   bun run zip
+   bun run verify:builds
+   bun run verify:sources
+   bun run release:prepare
    ```
 
 6. Complete [browser verification](verification.md) on current stable Chromium
@@ -42,11 +44,43 @@ or signing keys. A local zip is an unsigned build, not a published release.
 
 ## Publish artifacts
 
-CI stages the two unsigned extension ZIPs, the corresponding source ZIP, and
-`SHA256SUMS` as one `cookie-loom-unsigned-packages` artifact. Download it from a
-successful run on the exact revision you intend to release. CI never creates a
-GitHub release, signs an extension, or submits a store listing automatically.
-Complete the manual browser checks before promoting these artifacts.
+Regular CI stages the two unsigned extension ZIPs, the corresponding source ZIP,
+`RELEASE.json`, and `SHA256SUMS` as one `cookie-loom-unsigned-packages` artifact.
+It rebuilds from the source archive and compares every file in both browser ZIPs
+with the production builds. `RELEASE.json` records the source commit, Bun version,
+build run, and archive hashes. Artifacts expire; tagged preview releases provide
+durable downloads. No workflow signs an extension or submits a store listing.
+
+The preview workflow publishes only annotated tags named
+`v<package-version>-preview.<positive integer>` on commits already merged into
+`fpi`. It validates the tag/version and committed release notes, reruns the full
+CI suite including minimum-browser checks, downloads that run's verified
+artifact, and checks its checksums/source revision before publishing. Only the
+publication job has repository write permission. An existing release is never
+overwritten on a rerun.
+
+After reviewing and merging release preparation, create the preview tag on the
+exact merged commit. For example, for the first preview:
+
+```sh
+git switch fpi
+git pull --ff-only origin fpi
+git tag -a v0.1.0-preview.1 -m 'Cookie Loom 0.1.0 preview 1'
+git push origin refs/tags/v0.1.0-preview.1
+```
+
+Use [the committed release notes](releases/v0.1.0-preview.1.md) as the template
+for subsequent previews. A workflow failure leaves the release unpublished;
+inspect it before retrying. If upload succeeds but publication fails, a draft may
+remain: inspect its assets and finish that draft deliberately. Never replace an
+already published artifact. New fixes need a new source revision and preview tag.
+The browser manifests keep a store-compatible numeric version; a preview suffix
+belongs to the GitHub tag rather than the browser version.
+
+Preview notes must state untested manual checks and unsigned/temporary install
+limits. A stable/store release additionally requires native permission prompts,
+signed installation, update-path verification, and real listing URLs. The preview
+workflow does not promote a build to stable.
 
 Attach the browser-specific extension archives, source revision, and checksums
 to a tagged release. Include build instructions and the corresponding source
@@ -57,18 +91,25 @@ Use an annotated version tag and release notes that describe user-visible
 changes and remaining limitations. Confirm that the tag identifies the tested
 commit; do not rebuild from a different revision under the same version.
 
-`npm run zip` creates `cookie-loom-<version>-chrome.zip`,
+`bun run zip` creates `cookie-loom-<version>-chrome.zip`,
 `cookie-loom-<version>-firefox.zip`, and `cookie-loom-<version>-sources.zip` in
 `apps/extension/.output/`. The source archive contains the monorepo build inputs,
-root lockfile, shared core package, license notices, and documentation. WXT
+`bun.lock`, `bunfig.toml`, `.bun-version`, shared core package, license notices,
+the pinned web-ext patch, and documentation. WXT
 excludes test files; use the repository for the complete development/test suite.
 To verify the source artifact independently, extract it into an empty directory
-and run `npm ci` followed by `npm run build` with Node 24.
+and run `bun install --frozen-lockfile --ignore-scripts` followed by `bun run build`
+with Bun 1.4.3. No publisher credentials are needed for a source rebuild.
+Use `sha256sum --check SHA256SUMS` or `shasum -a 256 --check SHA256SUMS`
+after downloading all five release files. Checksums detect corruption; they do
+not by themselves authenticate the publisher.
 
 For Chromium, create a separate Chrome Web Store listing and complete its
 privacy and permission disclosures. The local `.output/chrome-mv3` directory
 is for unpacked development installation. Follow
 [Chrome's distribution guidance](https://developer.chrome.com/docs/extensions/how-to/distribute).
+Prepared copy, disclosures, exact-size images, and reviewer test instructions
+are in [the store submission kit](store-listing.md).
 
 For Firefox, submit the new extension for Mozilla signing, either for a public
 AMO listing or signed self-distribution. Ordinary release Firefox requires

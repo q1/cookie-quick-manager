@@ -2,24 +2,55 @@
 
 ## Requirements
 
-- Node.js 24 and npm (the repository includes a single npm lockfile).
+- [Bun 1.4.3](https://bun.sh/blog/bun-v1.4.3), matching `.bun-version` and
+  `packageManager` in `package.json`. Check your installation with `bun --version`.
 - A current Chromium-based browser and Firefox for real extension checks.
 - Playwright's Chromium and Firefox runtimes for the automated browser suite.
 
 ```sh
-npm ci
-npm run dev
+bun install --frozen-lockfile --ignore-scripts
+bun run dev
 ```
 
 Open the URL printed by Vite (normally `http://localhost:5173`). The demo uses
 synthetic cookies through a local adapter. It does not inspect your real browser
 cookie jar. Use it for interface work and tests without personal session data.
 
+## Bun toolchain
+
+The maintained development and release commands run under Bun. A separate Node.js
+or npm installation is not required. `bun.lock` pins the workspace dependency
+graph, and `bunfig.toml` keeps hoisted installation compatible with the extension
+tools. The documented install command disables lifecycle scripts; asset generation and WXT
+preparation run explicitly through the reviewed project commands.
+
+`bun run typecheck` prepares WXT's generated types and runs native `bun check`
+for both packages in parallel. Use the `typecheck` script name: `bun check` is
+Bun's built-in checker. TypeScript remains installed for editor and tool library
+types; Bun's checker does not emit JavaScript or declaration files.
+
+`bun run test` runs the native Bun unit suite with four parallel workers.
+`bun run test:watch` reruns units while you edit. Unit discovery excludes
+Playwright, native Firefox fixtures, and archived source; their dedicated
+commands remain separate.
+
+The [`run.bun` and `run.noOrphans` settings](https://bun.sh/docs/runtime/bunfig#bun-run)
+make packaged JavaScript commands use Bun and terminate descendant processes when
+their supervising process exits. Scripts use Bun's compatible `node:*` APIs.
+WXT and Vite still compile the browser extension; it executes in the browser's
+JavaScript engine. See [measured toolchain results](toolchain-performance.md).
+
+The exact Bun version is checked before builds, ZIP packaging, and typechecking.
+Upgrade `.bun-version`, `packageManager`, and the engine pin together.
+The pinned web-ext patch makes Firefox startup errors explicit under Bun while
+preserving connection retries. It is development tooling, included in the source
+ZIP for reproducibility. See [the patch review and removal criteria](dependency-review.md#bun-compatibility-patch).
+
 ## Run the extension
 
 ```sh
-npm run dev:chrome
-npm run dev:firefox
+bun run dev:chrome
+bun run dev:firefox
 ```
 
 These use WXT's browser-specific development builds. Follow the terminal
@@ -31,7 +62,7 @@ manifest when reviewing release permissions.
 ## Build and load production artifacts
 
 ```sh
-npm run build
+bun run build
 ```
 
 Chromium: open `chrome://extensions`, enable **Developer mode**, choose **Load
@@ -45,17 +76,18 @@ store-signed packages. See [Mozilla's temporary-installation guide](https://exte
 ## Checks
 
 ```sh
-npm run format:check
-npm audit --omit=dev
-npm run check
-npm test
-npm run build
-npm run lint:firefox
-npx playwright install chromium firefox
-npm run test:e2e
-npm run test:firefox
-npm run zip
-npm run verify:builds
+bun run format:check
+bun audit --prod
+bun run typecheck
+bun run test
+bun run build
+bun run lint:firefox
+bunx --bun playwright install chromium firefox
+bun run test:e2e
+bun run test:firefox
+bun run zip
+bun run verify:builds
+bun run verify:sources
 ```
 
 On Linux CI, Playwright may also require system libraries; install its browser
@@ -71,12 +103,12 @@ artifact with test-only host grants to exercise real browser cookie operations.
 The production optional-permission prompt cannot be accepted in headless Chrome
 and remains a manual verification item.
 
-`npm run test:firefox` uses a separate disposable Firefox profile and a copied
+`bun run test:firefox` uses a separate disposable Firefox profile and a copied
 artifact to exercise the real Firefox APIs, including containers, partitions,
 first-party isolation, and background lifecycle behavior. Its manifest also
 adds test-only host grants. Neither harness changes the production build.
 
-`npm run lint:firefox` runs the repository's reviewed validation wrapper. It
+`bun run lint:firefox` runs the repository's reviewed validation wrapper. It
 rejects manifest errors and unexpected warnings. React DOM's two internal
 `innerHTML` warnings are accepted only in its isolated vendor chunk, while the
 script rejects HTML-injection sinks in application source. This is an explicit
@@ -101,16 +133,18 @@ real cookie exports, personal profiles, or signing credentials.
 
 ## Dependency and release changes
 
-Commit the lockfile with dependency updates. Explain why a new runtime
+Commit `bun.lock` with dependency updates. Explain why a new runtime
 dependency is needed, its license, and whether it changes network or permission
 behavior. Build artifacts do not prove supply-chain safety; review dependency
 diffs and generated manifests. Packaging and publication steps are described in
 [the release guide](releasing.md).
 
-Run `npm run format:check` for formatting and `npm audit --omit=dev` for the
+Run `bun run format:check` for formatting and `bun audit --prod` for the
 production dependency audit. The current development-only advisory and its
 scope are recorded in [the dependency review](dependency-review.md).
 
 CI runs these checks on pull requests and pushes. It uploads unsigned browser
 archives, corresponding source, and SHA-256 checksums for review. Maintainers
-can also run CI manually; it does not publish releases or submit to stores.
+can also run CI manually. The separate annotated-tag workflow publishes GitHub
+previews after verification; browser signing and store submission require
+publisher accounts. See [the release guide](releasing.md).

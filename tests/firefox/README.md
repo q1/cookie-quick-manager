@@ -1,8 +1,12 @@
 # Native Firefox extension smoke test
 
-Run `npm run build`, then `node tests/firefox/run.mjs`. Set `FIREFOX_BINARY` to use
-a particular Firefox executable; otherwise the script uses an installed
+With Bun 1.4.3, run `bun run build`, then `bun run test:firefox`. Set
+`FIREFOX_BINARY` to use a particular Firefox executable; otherwise the script uses an installed
 Playwright Firefox binary. It does not download a browser.
+
+The installed web-ext includes the pinned Bun startup compatibility patch. See
+[the patch review](../../docs/dependency-review.md#bun-compatibility-patch) for its
+scope and removal criteria.
 
 The runner copies the built Firefox extension into a temporary directory and
 starts `web-ext` with a fresh disposable profile. The production background
@@ -28,3 +32,7 @@ passed, including distinct ancestor-bit partitions, container protection boundar
 same-name host-only/domain edits, concurrent background requests, and retaining
 cookies when the production background restarts with startup cleanup
 enabled. These runs used newly created test profiles and synthetic cookies only.
+
+Also verified on 2026-10-12 with official Firefox 140.0 (build ID 20250616215311):
+all 13 checks passed. CI pins and verifies that baseline download before repeating
+the native suite.

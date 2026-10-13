@@ -1,0 +1,9 @@
+[install]
+linker = "hoisted"
+
+[run]
+bun = true
+noOrphans = true
+
+[test]
+pathIgnorePatterns = ["tests/e2e/**", "tests/firefox/**", "legacy/**"]

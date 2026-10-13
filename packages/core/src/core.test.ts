@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'bun:test';
 import {
   cookieKey,
   cookieUrl,
@@ -160,16 +160,16 @@ describe('search and grouping', () => {
 
   it('combines quoted field terms, flags, and negation', () => {
     expect(filterCookies(records, 'name:theme value:"dark mode" -is:httponly')).toEqual([
-      records[0],
+      records[0]!,
     ]);
-    expect(filterCookies(records, 'is:secure domain:example -name:theme')).toEqual([records[1]]);
-    expect(filterCookies(records, 'store:private')).toEqual([records[2]]);
+    expect(filterCookies(records, 'is:secure domain:example -name:theme')).toEqual([records[1]!]);
+    expect(filterCookies(records, 'store:private')).toEqual([records[2]!]);
     expect(parseSearch('value:"an \\"escaped\\" phrase"')[0]?.field).toBe('value');
   });
 
   it('uses applicability for a current-site filter and exact store identity', () => {
-    expect(filterCookies(records, '', { domain: 'sub.example.com' })).toEqual([records[1]]);
-    expect(filterCookies(records, '', { storeId: 'firefox-private' })).toEqual([records[2]]);
+    expect(filterCookies(records, '', { domain: 'sub.example.com' })).toEqual([records[1]!]);
+    expect(filterCookies(records, '', { storeId: 'firefox-private' })).toEqual([records[2]!]);
   });
 
   it('groups equivalent domains and sorts without mutating input', () => {
