@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "extensionVersion": "0.1.1",
+  "browser": "149.0.7827.55",
+  "samples": 5,
+  "warmups": 1,
+  "cpuThrottle": 1,
+  "syntheticRows": 10000,
+  "bytes": 8947807,
+  "fixtureSha256": "9e979391f83d44d77189b264f19e869e9cd04a39cd2b0b01d1f48547d384d642",
+  "upfrontTestHostGrants": true,
+  "temporaryProfile": true,
+  "medians": {
+    "selected": {
+      "milliseconds": 639.8,
+      "frameGap": 480.8
+    },
+    "preview": {
+      "milliseconds": 132.7,
+      "frameGap": 67.7
+    }
+  },
+  "records": [
+    {
+      "selected": {
+        "milliseconds": 659,
+        "frameGap": 479.39999997615814,
+        "textareaLength": 8947807
+      },
+      "preview": {
+        "milliseconds": 132.69999998807907,
+        "frameGap": 67.59999996423721,
+        "longTasks": [474, 66]
+      }
+    },
+    {
+      "selected": {
+        "milliseconds": 634.5,
+        "frameGap": 480.80000001192093,
+        "textareaLength": 8947807
+      },
+      "preview": {
+        "milliseconds": 135.30000001192093,
+        "frameGap": 67.59999996423721,
+        "longTasks": [476, 66]
+      }
+    },
+    {
+      "selected": {
+        "milliseconds": 637.2000000476837,
+        "frameGap": 482,
+        "textareaLength": 8947807
+      },
+      "preview": {
+        "milliseconds": 126.19999998807907,
+        "frameGap": 68.39999997615814,
+        "longTasks": [476, 67]
+      }
+    },
+    {
+      "selected": {
+        "milliseconds": 659.9000000357628,
+        "frameGap": 480.19999998807907,
+        "textareaLength": 8947807
+      },
+      "preview": {
+        "milliseconds": 133,
+        "frameGap": 68,
+        "longTasks": [476, 66]
+      }
+    },
+    {
+      "selected": {
+        "milliseconds": 639.8000000119209,
+        "frameGap": 482.2999999523163,
+        "textareaLength": 8947807
+      },
+      "preview": {
+        "milliseconds": 132.70000004768372,
+        "frameGap": 67.69999998807907,
+        "longTasks": [476, 66]
+      }
+    }
+  ]
+}

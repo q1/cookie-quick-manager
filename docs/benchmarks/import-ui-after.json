@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "extensionVersion": "0.1.2",
+  "browser": "149.0.7827.55",
+  "samples": 5,
+  "warmups": 1,
+  "cpuThrottle": 1,
+  "syntheticRows": 10000,
+  "bytes": 8947807,
+  "fixtureSha256": "9e979391f83d44d77189b264f19e869e9cd04a39cd2b0b01d1f48547d384d642",
+  "upfrontTestHostGrants": true,
+  "temporaryProfile": true,
+  "medians": {
+    "selected": {
+      "milliseconds": 29.1,
+      "frameGap": 16.2
+    },
+    "preview": {
+      "milliseconds": 232.8,
+      "frameGap": 25.4
+    }
+  },
+  "records": [
+    {
+      "selected": {
+        "milliseconds": 34.59999996423721,
+        "frameGap": 16.30000001192093,
+        "textareaLength": 0
+      },
+      "preview": {
+        "milliseconds": 232.80000001192093,
+        "frameGap": 19.600000023841858,
+        "longTasks": []
+      }
+    },
+    {
+      "selected": {
+        "milliseconds": 23.100000023841858,
+        "frameGap": 16,
+        "textareaLength": 0
+      },
+      "preview": {
+        "milliseconds": 233,
+        "frameGap": 25.80000001192093,
+        "longTasks": []
+      }
+    },
+    {
+      "selected": {
+        "milliseconds": 29.100000023841858,
+        "frameGap": 17.80000001192093,
+        "textareaLength": 0
+      },
+      "preview": {
+        "milliseconds": 232.80000001192093,
+        "frameGap": 19.80000001192093,
+        "longTasks": []
+      }
+    },
+    {
+      "selected": {
+        "milliseconds": 36,
+        "frameGap": 16.099999964237213,
+        "textareaLength": 0
+      },
+      "preview": {
+        "milliseconds": 232.80000001192093,
+        "frameGap": 25.80000001192093,
+        "longTasks": []
+      }
+    },
+    {
+      "selected": {
+        "milliseconds": 28,
+        "frameGap": 16.19999998807907,
+        "textareaLength": 0
+      },
+      "preview": {
+        "milliseconds": 232.80000001192093,
+        "frameGap": 25.399999976158142,
+        "longTasks": []
+      }
+    }
+  ]
+}

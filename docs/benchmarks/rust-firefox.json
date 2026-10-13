@@ -1,0 +1,380 @@
+{
+  "schemaVersion": 1,
+  "browser": "firefox",
+  "browserVersion": "151.0",
+  "bun": "1.4.3",
+  "platform": "linux-x64",
+  "samples": 7,
+  "warmups": 1,
+  "cpuThrottle": 1,
+  "differentialCases": 1022,
+  "syntheticDataOnly": true,
+  "results": [
+    {
+      "fixture": "netscape-2000",
+      "bytes": 247807,
+      "engine": "main",
+      "rustUsed": false,
+      "resultSha256": "c889c47acae5ad19c01af8f8102d24d80e8b28a3aace20c99d8709642cdc2e2e",
+      "cold": {
+        "elapsed": 10,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 9,
+          "samples": [11, 8, 8, 9, 11, 11, 7]
+        },
+        "compute": {
+          "median": 9,
+          "samples": [11, 8, 8, 9, 11, 11, 7]
+        },
+        "maxFrameGap": {
+          "median": 16.06,
+          "samples": [17.06, 16.06, 16.06, 17.06, 16.04, 16.06, 16.04]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    },
+    {
+      "fixture": "netscape-2000",
+      "bytes": 247807,
+      "engine": "worker",
+      "rustUsed": false,
+      "resultSha256": "c889c47acae5ad19c01af8f8102d24d80e8b28a3aace20c99d8709642cdc2e2e",
+      "cold": {
+        "elapsed": 20,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 11,
+          "samples": [12, 11, 11, 10, 11, 10, 12]
+        },
+        "compute": {
+          "median": 9,
+          "samples": [8, 8, 9, 9, 10, 8, 11]
+        },
+        "maxFrameGap": {
+          "median": 17.04,
+          "samples": [17.04, 17.06, 17.04, 17.04, 17.04, 17.06, 17.04]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    },
+    {
+      "fixture": "netscape-2000",
+      "bytes": 247807,
+      "engine": "rust",
+      "rustUsed": true,
+      "resultSha256": "c889c47acae5ad19c01af8f8102d24d80e8b28a3aace20c99d8709642cdc2e2e",
+      "cold": {
+        "elapsed": 24,
+        "initMs": 2
+      },
+      "milliseconds": {
+        "total": {
+          "median": 12,
+          "samples": [14, 12, 12, 12, 13, 12, 11]
+        },
+        "compute": {
+          "median": 9,
+          "samples": [11, 10, 10, 8, 9, 9, 9]
+        },
+        "maxFrameGap": {
+          "median": 17.06,
+          "samples": [17.08, 17.06, 17.06, 17.04, 17.06, 17.04, 17.06]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 1900544
+    },
+    {
+      "fixture": "netscape-10000",
+      "bytes": 9107807,
+      "engine": "main",
+      "rustUsed": false,
+      "resultSha256": "32e30cf3769ced69ce7a7db03336f6dbfa64e6fa1c8427b7acfc4fcc9c291558",
+      "cold": {
+        "elapsed": 59,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 62,
+          "samples": [59, 55, 71, 55, 62, 68, 68]
+        },
+        "compute": {
+          "median": 62,
+          "samples": [59, 55, 71, 55, 62, 68, 68]
+        },
+        "maxFrameGap": {
+          "median": 49.38,
+          "samples": [49.02, 49.24, 65.9, 49.38, 49.22, 66.9, 66.3]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    },
+    {
+      "fixture": "netscape-10000",
+      "bytes": 9107807,
+      "engine": "worker",
+      "rustUsed": false,
+      "resultSha256": "32e30cf3769ced69ce7a7db03336f6dbfa64e6fa1c8427b7acfc4fcc9c291558",
+      "cold": {
+        "elapsed": 75,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 74,
+          "samples": [91, 74, 72, 88, 74, 70, 105]
+        },
+        "compute": {
+          "median": 57,
+          "samples": [66, 57, 57, 72, 56, 56, 89]
+        },
+        "maxFrameGap": {
+          "median": 17.06,
+          "samples": [17.06, 17.06, 17.06, 17.06, 17.06, 17.06, 17.06]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    },
+    {
+      "fixture": "netscape-10000",
+      "bytes": 9107807,
+      "engine": "rust",
+      "rustUsed": true,
+      "resultSha256": "32e30cf3769ced69ce7a7db03336f6dbfa64e6fa1c8427b7acfc4fcc9c291558",
+      "cold": {
+        "elapsed": 115,
+        "initMs": 2
+      },
+      "milliseconds": {
+        "total": {
+          "median": 104,
+          "samples": [112, 104, 95, 125, 103, 97, 104]
+        },
+        "compute": {
+          "median": 88,
+          "samples": [92, 92, 83, 106, 85, 84, 88]
+        },
+        "maxFrameGap": {
+          "median": 17.06,
+          "samples": [17.06, 17.06, 17.06, 17.06, 17.06, 17.06, 17.06]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 14024704
+    },
+    {
+      "fixture": "unicode-2000",
+      "bytes": 271807,
+      "engine": "main",
+      "rustUsed": false,
+      "resultSha256": "54549ebe33ec4b40ad382b5cb3325eb7878c1229f6a8a76aeffe395b2146dca8",
+      "cold": {
+        "elapsed": 10,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 9,
+          "samples": [9, 8, 9, 9, 12, 13, 13]
+        },
+        "compute": {
+          "median": 9,
+          "samples": [9, 8, 9, 9, 12, 13, 12]
+        },
+        "maxFrameGap": {
+          "median": 16.06,
+          "samples": [17.04, 16.54, 17.04, 16.06, 16.06, 16.06, 16.04]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    },
+    {
+      "fixture": "unicode-2000",
+      "bytes": 271807,
+      "engine": "worker",
+      "rustUsed": false,
+      "resultSha256": "54549ebe33ec4b40ad382b5cb3325eb7878c1229f6a8a76aeffe395b2146dca8",
+      "cold": {
+        "elapsed": 24,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 14,
+          "samples": [13, 14, 15, 15, 11, 14, 11]
+        },
+        "compute": {
+          "median": 9,
+          "samples": [9, 9, 11, 11, 8, 11, 7]
+        },
+        "maxFrameGap": {
+          "median": 17.04,
+          "samples": [17.02, 17.04, 16.04, 17.04, 17.06, 17.06, 17.06]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    },
+    {
+      "fixture": "unicode-2000",
+      "bytes": 271807,
+      "engine": "rust",
+      "rustUsed": true,
+      "resultSha256": "54549ebe33ec4b40ad382b5cb3325eb7878c1229f6a8a76aeffe395b2146dca8",
+      "cold": {
+        "elapsed": 27,
+        "initMs": 2
+      },
+      "milliseconds": {
+        "total": {
+          "median": 16,
+          "samples": [16, 16, 16, 16, 15, 16, 16]
+        },
+        "compute": {
+          "median": 12,
+          "samples": [12, 12, 12, 12, 12, 13, 11]
+        },
+        "maxFrameGap": {
+          "median": 17.06,
+          "samples": [17.06, 17.06, 17.06, 17.04, 17.06, 17.04, 17.06]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 1966080
+    },
+    {
+      "fixture": "json-10000",
+      "bytes": 8227880,
+      "engine": "main",
+      "rustUsed": false,
+      "resultSha256": "9fcb8ac7874808765a0e38e0209643c739eaf415f74bd9eb97f4ab96fea4d294",
+      "cold": {
+        "elapsed": 58,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 57,
+          "samples": [57, 54, 65, 58, 53, 53, 62]
+        },
+        "compute": {
+          "median": 57,
+          "samples": [57, 54, 65, 58, 53, 53, 62]
+        },
+        "maxFrameGap": {
+          "median": 49.78,
+          "samples": [49.78, 49.14, 66.46, 48.82, 49.84, 48.82, 66.74]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    },
+    {
+      "fixture": "json-10000",
+      "bytes": 8227880,
+      "engine": "worker",
+      "rustUsed": false,
+      "resultSha256": "9fcb8ac7874808765a0e38e0209643c739eaf415f74bd9eb97f4ab96fea4d294",
+      "cold": {
+        "elapsed": 72,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 71,
+          "samples": [84, 71, 70, 67, 89, 68, 71]
+        },
+        "compute": {
+          "median": 54,
+          "samples": [65, 54, 56, 53, 75, 54, 54]
+        },
+        "maxFrameGap": {
+          "median": 17.06,
+          "samples": [17.06, 17.06, 17.06, 17.06, 17.06, 17.06, 17.06]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    },
+    {
+      "fixture": "json-10000",
+      "bytes": 8227880,
+      "engine": "rust",
+      "rustUsed": false,
+      "resultSha256": "9fcb8ac7874808765a0e38e0209643c739eaf415f74bd9eb97f4ab96fea4d294",
+      "cold": {
+        "elapsed": 73,
+        "initMs": 0
+      },
+      "milliseconds": {
+        "total": {
+          "median": 71,
+          "samples": [79, 73, 71, 70, 93, 70, 63]
+        },
+        "compute": {
+          "median": 55,
+          "samples": [63, 55, 54, 55, 77, 55, 53]
+        },
+        "maxFrameGap": {
+          "median": 17.06,
+          "samples": [17.06, 17.06, 17.06, 17.06, 17.06, 17.06, 17.06]
+        },
+        "longTasks": {
+          "median": 0,
+          "samples": [0, 0, 0, 0, 0, 0, 0]
+        }
+      },
+      "wasmMemoryBytes": 0
+    }
+  ],
+  "wasm": {
+    "bytes": 30702,
+    "gzipBytes": 13432,
+    "sha256": "fdfb949f2bf6455bab2e37d573c8d12f7043169e2a1551e1430c6935a71c337b"
+  },
+  "memoryNote": "Wasm linear memory includes its reserved pages; frame/long-task metrics measure only the UI page. Total worker/process memory is not measured by this report."
+}

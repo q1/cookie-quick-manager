@@ -1,0 +1,17 @@
+[
+  {
+    "profile": "release",
+    "bytes": 31034,
+    "gzipBytes": 13898
+  },
+  {
+    "profile": "speed",
+    "bytes": 30702,
+    "gzipBytes": 13432
+  },
+  {
+    "profile": "small",
+    "bytes": 31343,
+    "gzipBytes": 13969
+  }
+]

@@ -1,8 +1,7 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   cookieKey,
   exportNetscape,
-  importCookies,
   serializeBackup,
   type CookieRecord,
   type ImportResult,
@@ -10,6 +9,7 @@ import {
 import { Upload, Download, CheckCircle2 } from 'lucide-react';
 import { useWorkspace } from './context';
 import { ErrorNotice, Modal } from './shared';
+import { previewImport } from '../lib/import-preview';
 
 export function TransferDialog({
   mode,
@@ -23,6 +23,11 @@ export function TransferDialog({
   const { gateway, stores, refresh, notify } = useWorkspace();
   const [format, setFormat] = useState('json');
   const [text, setText] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const activePreview = useRef<AbortController | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  useLayoutEffect(() => () => activePreview.current?.abort(), []);
   const [target, setTarget] = useState(stores[0]?.id ?? '');
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [error, setError] = useState('');
@@ -52,47 +57,68 @@ export function TransferDialog({
       };
     }
   }, [cookies, stores, format, mode]);
-  const destinations =
-    preview?.cookies.map((cookie) =>
-      storeMode === 'map' ? { ...cookie, storeId: target } : cookie,
-    ) ?? [];
-  const unknownStores = [
-    ...new Set(
-      destinations
-        .filter((cookie) => !stores.some((store) => store.id === cookie.storeId))
-        .map((cookie) => cookie.storeId),
-    ),
-  ];
-  const collisionCount = destinations.length - new Set(destinations.map(cookieKey)).size;
-  function review() {
+  const destinations = useMemo(
+    () =>
+      preview?.cookies.map((cookie) =>
+        storeMode === 'map' ? { ...cookie, storeId: target } : cookie,
+      ) ?? [],
+    [preview, storeMode, target],
+  );
+  const unknownStores = useMemo(() => {
+    const available = new Set(stores.map((store) => store.id));
+    return [
+      ...new Set(
+        destinations
+          .filter((cookie) => !available.has(cookie.storeId))
+          .map((cookie) => cookie.storeId),
+      ),
+    ];
+  }, [destinations, stores]);
+  const collisionCount = useMemo(
+    () => destinations.length - new Set(destinations.map(cookieKey)).size,
+    [destinations],
+  );
+  async function review() {
+    if (activePreview.current) return;
+    const controller = new AbortController();
+    activePreview.current = controller;
+    setReviewing(true);
+    setError('');
     try {
-      setPreview(
-        importCookies(text, {
+      const result = await previewImport(
+        file ?? text,
+        {
           storeId: target,
           netscapeMode: legacyNetscape ? 'legacy-cqm' : 'standard',
-        }),
+        },
+        controller.signal,
       );
-      setError('');
+      if (controller.signal.aborted) return;
+      setPreview(result);
     } catch (reason) {
+      if (controller.signal.aborted) return;
       setPreview(null);
       setError(reason instanceof Error ? reason.message : 'Unable to read this backup.');
+    } finally {
+      if (!controller.signal.aborted) {
+        activePreview.current = null;
+        setReviewing(false);
+      }
     }
   }
-  async function readFile(event: ChangeEvent<HTMLInputElement>) {
+  function readFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     setPreview(null);
+    setFile(null);
+    setText('');
     if (file.size > 10 * 1024 * 1024) {
       setError('Choose a backup smaller than 10 MiB.');
+      event.target.value = '';
       return;
     }
-    try {
-      setText(await file.text());
-      setPreview(null);
-      setError('');
-    } catch {
-      setError('This file could not be read.');
-    }
+    setFile(file);
+    setError('');
   }
   async function restore() {
     if (!preview || !target || busy) return;
@@ -211,11 +237,20 @@ export function TransferDialog({
             Backup file
             <input
               type="file"
+              ref={fileInput}
               accept=".json,.txt,application/json,text/plain"
-              onChange={(event) => void readFile(event)}
-              disabled={busy}
+              onChange={readFile}
+              disabled={busy || reviewing}
             />
           </label>
+          {file && (
+            <p className="small muted selected-backup">
+              <span className="cell-truncate" title={file.name}>
+                {file.name}
+              </span>
+              <span>{(file.size / 1024).toFixed(0)} KiB</span>
+            </p>
+          )}
           <label className="field">
             Or paste contents
             <textarea
@@ -223,11 +258,14 @@ export function TransferDialog({
               value={text}
               onChange={(event) => {
                 setText(event.target.value);
+                setFile(null);
+                if (fileInput.current) fileInput.current.value = '';
                 setPreview(null);
+                setError('');
               }}
               spellCheck={false}
               placeholder="Paste JSON or Netscape cookie data"
-              disabled={busy}
+              disabled={busy || reviewing}
             />
           </label>
           <label className="check-label">
@@ -238,7 +276,7 @@ export function TransferDialog({
                 setLegacyNetscape(event.target.checked);
                 setPreview(null);
               }}
-              disabled={busy}
+              disabled={busy || reviewing}
             />
             Legacy Cookie Quick Manager Netscape export
           </label>
@@ -254,7 +292,7 @@ export function TransferDialog({
                 setStoreMode(event.target.value as 'preserve' | 'map');
                 setMappingAcknowledged(false);
               }}
-              disabled={busy}
+              disabled={busy || reviewing}
             >
               <option value="preserve">Preserve saved stores</option>
               <option value="map">Import into one store</option>
@@ -272,7 +310,7 @@ export function TransferDialog({
                 setTarget(event.target.value);
                 setPreview(null);
               }}
-              disabled={busy}
+              disabled={busy || reviewing}
             >
               {stores.map((store) => (
                 <option key={store.id} value={store.id}>
@@ -288,7 +326,7 @@ export function TransferDialog({
                   type="checkbox"
                   checked={mappingAcknowledged}
                   onChange={(event) => setMappingAcknowledged(event.target.checked)}
-                  disabled={busy}
+                  disabled={busy || reviewing}
                 />
                 I understand private and container cookies will share the selected store.
               </label>
@@ -299,7 +337,7 @@ export function TransferDialog({
               type="checkbox"
               checked={replace}
               onChange={(event) => setReplace(event.target.checked)}
-              disabled={busy}
+              disabled={busy || reviewing}
             />
             Replace matching cookies
           </label>
@@ -377,10 +415,11 @@ export function TransferDialog({
             ) : (
               <button
                 className="button primary"
-                disabled={!text.trim() || !target}
-                onClick={review}
+                disabled={(!file && !text.trim()) || !target || reviewing}
+                aria-busy={reviewing}
+                onClick={() => void review()}
               >
-                Review import
+                {reviewing ? 'Reviewing…' : 'Review import'}
               </button>
             )}
           </div>

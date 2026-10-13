@@ -9,11 +9,13 @@ new TypeScript / Preact codebase and shared Chromium and Firefox builds. It
 continues under GPL-3.0-or-later and retains the original project's history and
 attribution. See [NOTICE](NOTICE) and [the migration guide](docs/migration.md).
 
-**Status: 0.1.1 public preview.** Download the unsigned browser ZIPs, reproducible
-source, and checksums from [the preview release](https://github.com/q1/cookie-quick-manager/releases/tag/v0.1.1-preview.1).
+**Status: 0.1.2 public preview.** Download the unsigned browser ZIPs, reproducible
+source, and checksums from [the preview release](https://github.com/q1/cookie-quick-manager/releases/tag/v0.1.2-preview.1).
 
 The [0.1.1 performance comparison](docs/extension-performance.md) records smaller
 packages, faster large-profile workflows, and the reproducible benchmark.
+The [Rust experiment and large-import comparison](docs/rust-experiment.md) explain
+why 0.1.2 retains TypeScript and moves large previews into a worker.
 Chromium can load the extracted build unpacked; Firefox supports a temporary
 development installation. No Cookie Loom browser-store release is claimed here.
 Targets are desktop Chromium 132+ and Firefox 140+; browser-specific behavior

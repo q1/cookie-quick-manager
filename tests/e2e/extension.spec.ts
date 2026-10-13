@@ -55,7 +55,7 @@ test('the unchanged production extension loads with an explicit no-host-access s
   }
 });
 
-test('large domain lists stay searchable and the popup retains parent paths and partitions', async () => {
+test('large domain search, site-scoped popup, and file preview worker work in the compiled extension', async () => {
   const temporary = await mkdtemp(path.join(tmpdir(), 'cookie-loom-scoped-popup-'));
   let context: BrowserContext | undefined;
   try {
@@ -127,6 +127,22 @@ test('large domain lists stay searchable and the popup retains parent paths and 
     );
     await expect(popup.locator('.popup-summary strong').first()).toHaveText('3cookies');
     await expect(popup.locator('.popup-summary strong').nth(1)).toHaveText('0protected');
+    const count = (await context.cookies()).length;
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import cookies' });
+    const backup = Array.from(
+      { length: 2000 },
+      (_, index) => `example.test\tFALSE\t/p/${index}\tTRUE\t0\tpreview_${index}\tvalue`,
+    ).join('\n');
+    await dialog.getByLabel('Backup file').setInputFiles({
+      name: 'synthetic-native.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from(backup),
+    });
+    await expect(dialog.getByLabel('Or paste contents')).toHaveValue('');
+    await dialog.getByRole('button', { name: 'Review import', exact: true }).click();
+    await expect(dialog.getByRole('heading', { name: '2000 valid cookies' })).toBeVisible();
+    expect((await context.cookies()).length).toBe(count);
     expect(errors).toEqual([]);
   } finally {
     await context?.close();

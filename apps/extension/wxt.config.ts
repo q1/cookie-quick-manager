@@ -56,7 +56,7 @@ export default defineConfig({
     name: 'Cookie Loom',
     description:
       'Your cookies, untangled. A private cookie workbench with safe cleanup and portable backups.',
-    version: '0.1.1',
+    version: '0.1.2',
     homepage_url: 'https://github.com/q1/cookie-quick-manager',
     permissions: [
       'cookies',

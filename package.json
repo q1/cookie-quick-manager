@@ -1,6 +1,6 @@
 {
   "name": "cookie-loom",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "A local-first cookie workbench for Firefox and Chromium.",
   "license": "GPL-3.0-or-later",
@@ -36,7 +36,9 @@
     "release:prepare": "bun scripts/prepare-release.mjs",
     "prepare:assets": "bun scripts/prepare-assets.mjs",
     "prepare:store": "bun scripts/prepare-store-assets.mjs",
-    "benchmark:extension": "bun scripts/benchmark-extension.mjs"
+    "benchmark:extension": "bun scripts/benchmark-extension.mjs",
+    "build:transfer-lab": "bun scripts/build-transfer-lab.mjs",
+    "benchmark:transfers": "bun scripts/benchmark-transfers.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.61.0",

@@ -3,6 +3,30 @@
 Notable user-facing changes are recorded here. Cookie Loom versions are
 independent of the historical Cookie Quick Manager version numbers.
 
+## 0.1.2-preview.1 — 2026-10-12
+
+### Changed
+
+- Selected backup files are read in a disposable worker and no longer expanded
+  into the textarea. Large pasted imports also use a worker; small pastes retain
+  the inline path. Preview processing shows a busy state and can be canceled.
+- Workers terminate on completion, failure, and dialog close. Pending parsing
+  locks configuration, and obsolete previews cannot replace a later source.
+- Preview store/collision summaries use memoized maps and sets.
+
+### Added
+
+- A reproducible Rust/Wasm scanner experiment with three compiler profiles,
+  Chromium/Firefox comparisons, and 1,022 differential cases per browser.
+- Before/after measurements of the compiled extension's large-file workflow.
+- Worker lifecycle, file replacement, oversized-input, and native extension-CSP
+  regressions. The suite has 159 unit tests, 64 browser workflows, and 14 native
+  Firefox checks including the production preview worker.
+
+Rust did not show a consistent end-to-end benefit and remains outside production
+builds. The TypeScript worker improves responsiveness with about a 6% browser
+package increase; review-stage latency can rise. See [the results](docs/rust-experiment.md).
+
 ## 0.1.1-preview.1 — 2026-10-12
 
 The second unsigned GitHub preview. Browser manifests use `0.1.1`.

@@ -148,3 +148,17 @@ Protection does not block website changes. Local storage cleanup does not
 clear IndexedDB, cache, service workers, or every third-party storage partition.
 The current target is desktop Chromium and Firefox; Safari and mobile browsers
 require separate capability and interface verification.
+
+## Large import processing
+
+In 0.1.2, selected files and large pasted inputs use a disposable TypeScript
+worker. File handles are read in the worker; the textarea stays available for
+paste input without rendering multi-megabyte selected files. The client
+terminates workers on completion, failure, or abort. Configuration is locked
+while parsing, and an aborted result cannot overwrite a subsequent preview.
+The same core validator runs in both inline and worker paths. Mutations stay
+on the existing serialized gateway.
+
+The [Rust/Wasm experiment](rust-experiment.md) remains outside production after
+comparison with the TypeScript controls. The optional CI checks parity; Rust
+is not required to build or reproduce the browser packages.
