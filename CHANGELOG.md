@@ -3,6 +3,39 @@
 Notable user-facing changes are recorded here. Cookie Loom versions are
 independent of the historical Cookie Quick Manager version numbers.
 
+## 0.1.1-preview.1 — 2026-10-12
+
+The second unsigned GitHub preview. Browser manifests use `0.1.1`.
+
+### Changed
+
+- Preact replaces the React DOM renderer; advanced tools load from local chunks
+  on demand. Browser ZIPs fall from about 138 KB to 84 KB.
+- The popup reads its captured site's store and host scope. Cookie edits verify
+  matching identities without reading the whole profile.
+- Large domain lists show 50 entries initially, with complete search and Show
+  more; the selected domain stays visible. The narrow-layout domain filter
+  survives resizing, and hidden desktop options are no longer mounted.
+- Shared domain/identity indexes, a reused date formatter, and fewer store
+  enumerations reduce repeated work. Refresh has an explicit busy state.
+- Dirty-draft and keyboard guards run synchronously, and nested dialogs restore
+  focus after closing. Existing stale-write and cleanup safeguards are retained.
+- Reproducible-source archives omit documentation PNGs while preserving build
+  inputs, runtime icons, licenses, and attribution. The imagery remains in Git.
+
+### Added
+
+- A native-cookie benchmark with committed before/after samples and methodology.
+  On the 2,000-cookie Chromium fixture, workbench startup took 59% less time;
+  results are specific to the measured environment.
+- Raw installed/startup JavaScript and ZIP size budgets in CI.
+- Scoped-read and large-domain regressions: 153 unit tests, 58 browser workflows,
+  four native Chrome workflows, and 14 native Firefox checks. Minimum versions
+  remain Chrome 132 and Firefox 140.
+
+See [the performance record](docs/extension-performance.md) and
+[review](docs/review-2026-10-12-optimization.md). Store publication remains pending.
+
 ## 0.1.0-preview.1 — 2026-10-12
 
 The first public GitHub preview. Browser manifests use `0.1.0`; packages are

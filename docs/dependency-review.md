@@ -3,10 +3,17 @@
 Checked on 2026-10-12 with Bun 1.4.3 and the committed `bun.lock`.
 
 `bun audit --prod` reports **zero production dependency advisories**, checking
-four packages. The full `bun audit` reports one high-severity `node-forge`
+three packages after the Preact renderer change (previously four). The full `bun audit` reports one high-severity `node-forge`
 advisory through `web-ext` and `@devicefarmer/adbkit`:
 [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv).
 The registry currently offers no patched release for this advisory.
+
+Preact 11.0.1 and its compatibility layer replace the bundled React DOM runtime.
+The pinned [official Vite preset](https://github.com/preactjs/preset-vite) aliases
+React imports in both production and demo; React remains installed to satisfy
+Lucide's peer contract. The browser bundle contains Preact, Lucide, and WXT's
+browser adapter, with regenerated MIT/ISC notices. Review the renderer warning
+exception and browser regressions when updating this dependency.
 
 The historical 2026-10-08 npm audit also found zero production advisories. Its
 full-tree report listed four high-severity entries for this same advisory,
