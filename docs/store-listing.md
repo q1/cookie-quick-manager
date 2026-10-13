@@ -1,6 +1,6 @@
 # Browser-store submission kit
 
-Prepared for the `0.1.1` desktop preview. This is listing copy and reviewer
+Prepared for the `0.1.2` desktop preview. This is listing copy and reviewer
 guidance, not a submitted or approved listing. The publisher must use their own
 developer accounts; Cookie Loom has a separate identity from Cookie Quick Manager.
 
@@ -70,9 +70,9 @@ and the current store definitions; the publisher makes the final declarations.
 
 ## Uploads and images
 
-- Chromium: upload `cookie-loom-0.1.1-chrome.zip` as a new item.
-- Firefox: upload `cookie-loom-0.1.1-firefox.zip` under the stable new ID
-  `cookie-loom@q1.github.io`; provide `cookie-loom-0.1.1-sources.zip` when asked
+- Chromium: upload `cookie-loom-0.1.2-chrome.zip` as a new item.
+- Firefox: upload `cookie-loom-0.1.2-firefox.zip` under the stable new ID
+  `cookie-loom@q1.github.io`; provide `cookie-loom-0.1.2-sources.zip` when asked
   for original source. Do not upload under Cookie Quick Manager's ID.
 - Use [store assets](store-assets/) for the required 1280×800 screenshot and
   440×280 promotional image. They show the actual UI with synthetic data.

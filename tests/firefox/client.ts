@@ -5,6 +5,7 @@ import { withRemoteMutations } from '../../apps/extension/src/lib/mutation-coord
 declare const browser: BrowserApi & {
   runtime: BrowserApi['runtime'] & { sendMessage(message: unknown): Promise<unknown> };
 };
+declare const __IMPORT_PREVIEW_WORKER__: string;
 
 const run = new URLSearchParams(location.search).get('nativeRun');
 const resultKey = 'cookieLoomNativeCoordinatorResult';
@@ -17,6 +18,26 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 void (async () => {
+  const previewWorker = new Worker(browser.runtime.getURL(__IMPORT_PREVIEW_WORKER__), {
+    type: 'module',
+  });
+  try {
+    const result = await new Promise<any>((resolve, reject) => {
+      previewWorker.onmessage = (event) => resolve(event.data.result);
+      previewWorker.onerror = () =>
+        reject(new Error('Production preview worker failed under Firefox extension CSP.'));
+      previewWorker.postMessage({
+        input: new Blob(['example.test\tFALSE\t/account\tTRUE\t0\tnative_preview\tvalue']),
+        options: { storeId: 'firefox-default' },
+      });
+    });
+    assert(
+      result.cookies.length === 1 && result.cookies[0].path === '/account' && !result.errors.length,
+      'Production worker did not validate the file preview.',
+    );
+  } finally {
+    previewWorker.terminate();
+  }
   const before = await gateway.getPreferences();
   const seed = (name: string): CookieRecord => ({
     name,

@@ -160,3 +160,11 @@ archives, corresponding source, and SHA-256 checksums for review. Maintainers
 can also run CI manually. The separate annotated-tag workflow publishes GitHub
 previews after verification; browser signing and store submission require
 publisher accounts. See [the release guide](releasing.md).
+
+## Optional Rust experiment
+
+Normal extension builds still need only Bun 1.4.3. Rust is isolated in
+`experiments/rust-backup`, with its own compiler preflight and frozen Cargo lock.
+See [the lab instructions](../experiments/rust-backup/README.md) and
+[measured results](rust-experiment.md). The runtime extension includes a
+TypeScript import worker; it has no Wasm module or new CSP allowance.

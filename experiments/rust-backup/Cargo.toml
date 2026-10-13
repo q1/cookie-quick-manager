@@ -1,0 +1,25 @@
+[package]
+name = "cookie-loom-backup-scan"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "GPL-3.0-or-later"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[profile.speed]
+inherits = "release"
+opt-level = 3
+
+[profile.small]
+inherits = "release"
+opt-level = "z"

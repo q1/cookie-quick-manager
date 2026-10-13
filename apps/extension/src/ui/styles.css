@@ -1600,3 +1600,14 @@ dialog.inspector::backdrop {
   margin: 8px 10px;
   font-size: 12px;
 }
+.selected-backup {
+  display: flex;
+  gap: 8px;
+}
+.selected-backup > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.selected-backup > :last-child {
+  white-space: nowrap;
+}

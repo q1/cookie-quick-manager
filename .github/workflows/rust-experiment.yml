@@ -1,0 +1,39 @@
+name: Rust experiment
+
+on:
+  pull_request:
+    paths:
+      [
+        'experiments/rust-backup/**',
+        'scripts/benchmark-transfers.mjs',
+        'scripts/build-transfer-lab.mjs',
+        '.github/workflows/rust-experiment.yml',
+      ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: Rust scanner parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RUST_LAB_TOOLCHAIN: '1.98.0'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.4.3'
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun check -p experiments/rust-backup
+      - run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt --target wasm32-unknown-unknown
+      - run: cargo +1.98.0 fmt --check --manifest-path experiments/rust-backup/Cargo.toml
+      - run: cargo +1.98.0 test --locked --manifest-path experiments/rust-backup/Cargo.toml
+      - run: bun run build:transfer-lab speed
+      - run: bunx --bun playwright install --with-deps chromium firefox
+      - run: bun run benchmark:transfers -- --samples 1
+      - run: bun run benchmark:transfers -- --browser firefox --samples 1

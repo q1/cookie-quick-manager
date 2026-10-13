@@ -14,7 +14,7 @@
     },
     "apps/extension": {
       "name": "@cookie-loom/extension",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "dependencies": {
         "@cookie-loom/core": "*",
         "lucide-react": "0.468.0",
@@ -32,7 +32,7 @@
     },
     "packages/core": {
       "name": "@cookie-loom/core",
-      "version": "0.1.1",
+      "version": "0.1.2",
     },
   },
   "patchedDependencies": {

@@ -73,6 +73,10 @@ try {
   await cp(production, source, { recursive: true });
   const artifact = await readFile(join(source, 'manifest.json'));
   const background = await readFile(join(source, 'background.js'));
+  const previewWorker = (await readdir(join(source, 'assets'))).find((name) =>
+    /^import-preview-[\w-]+\.js$/.test(name),
+  );
+  if (!previewWorker) throw new Error('Production import preview worker is missing.');
   const manifest = JSON.parse(artifact);
   // Only this disposable copy is changed. The full grant lets the unmodified
   // gateway perform its real permission check; test cookies use *.localhost.
@@ -91,7 +95,10 @@ try {
       configFile: false,
       root,
       logLevel: 'error',
-      define: { __FIREFOX_REPORT_URL__: JSON.stringify(reportUrl) },
+      define: {
+        __FIREFOX_REPORT_URL__: JSON.stringify(reportUrl),
+        __IMPORT_PREVIEW_WORKER__: JSON.stringify(`/assets/${previewWorker}`),
+      },
       resolve: { alias: { '@cookie-loom/core': join(root, 'packages/core/src/index.ts') } },
       build: {
         target: 'firefox140',
