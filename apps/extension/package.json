@@ -1,6 +1,6 @@
 {
   "name": "@cookie-loom/extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "license": "GPL-3.0-or-later",
@@ -16,14 +16,13 @@
   "dependencies": {
     "@cookie-loom/core": "*",
     "lucide-react": "0.468.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "preact": "11.0.1",
+    "react": "19.3.0"
   },
   "devDependencies": {
+    "@preact/preset-vite": "2.10.6",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "5.2.0",
-    "@wxt-dev/module-react": "1.2.2",
     "vite": "8.3.4",
     "web-ext": "10.7.0",
     "wxt": "0.21.4"

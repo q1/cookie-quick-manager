@@ -77,6 +77,13 @@ test('mobile domain filtering stays within the viewport', async ({ page }) => {
   await expect(page.locator('.cookie-table tbody tr')).toHaveCount(4);
   await expect(page.getByRole('button', { name: '_gh_sess', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'session_id', exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(domain).toHaveCount(0);
+  await expect(page.locator('.cookie-table tbody tr')).toHaveCount(4);
+  await page.setViewportSize({ width: 768, height: 1000 });
+  await expect(domain).toBeVisible();
+  await expect(domain).toHaveValue('github.com');
+  await page.setViewportSize({ width: 320, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   await domain.selectOption('');
   await expect(page.locator('.cookie-table tbody tr')).toHaveCount(15);

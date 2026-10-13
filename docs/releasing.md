@@ -37,7 +37,7 @@ or signing keys. A local zip is an unsigned build, not a published release.
 6. Complete [browser verification](verification.md) on current stable Chromium
    and Firefox. Record exact versions, results, and known limitations. Do not
    infer Firefox API support from a Chromium test or a demo screenshot.
-   Review the explicit React vendor warning exception in
+   Review the explicit Preact vendor warning exception in
    [the development guide](development.md); raw `web-ext lint` is not warning-free.
 7. Inspect extension archives. Exclude the legacy extension, test profiles,
    synthetic demo entrypoints, development tooling, secrets, and cookie exports.
@@ -65,8 +65,8 @@ exact merged commit. For example, for the first preview:
 ```sh
 git switch fpi
 git pull --ff-only origin fpi
-git tag -a v0.1.0-preview.1 -m 'Cookie Loom 0.1.0 preview 1'
-git push origin refs/tags/v0.1.0-preview.1
+git tag -a v0.1.1-preview.1 -m 'Cookie Loom 0.1.1 preview 1'
+git push origin refs/tags/v0.1.1-preview.1
 ```
 
 Use [the committed release notes](releases/v0.1.0-preview.1.md) as the template
@@ -96,7 +96,11 @@ commit; do not rebuild from a different revision under the same version.
 `apps/extension/.output/`. The source archive contains the monorepo build inputs,
 `bun.lock`, `bunfig.toml`, `.bun-version`, shared core package, license notices,
 the pinned web-ext patch, and documentation. WXT
-excludes test files; use the repository for the complete development/test suite.
+excludes test files and documentation PNG screenshots/concepts; runtime icons
+remain included. Use the repository for the complete development/test suite,
+design imagery, and store screenshots. CI enforces 95,000 bytes per browser ZIP
+and 500,000 bytes for the build-input source ZIP, alongside raw startup/installed
+budgets. Increases require an explicit reviewed justification.
 To verify the source artifact independently, extract it into an empty directory
 and run `bun install --frozen-lockfile --ignore-scripts` followed by `bun run build`
 with Bun 1.4.3. No publisher credentials are needed for a source rebuild.

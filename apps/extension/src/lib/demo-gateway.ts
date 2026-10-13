@@ -1,4 +1,10 @@
-import { cookieKey, validateCookie, type CookieRecord, type CookieStore } from '@cookie-loom/core';
+import {
+  cookieKey,
+  domainMatches,
+  validateCookie,
+  type CookieRecord,
+  type CookieStore,
+} from '@cookie-loom/core';
 import { DEFAULT_PREFERENCES, type Gateway, type Preferences } from './types';
 
 const DEMO_STORES: CookieStore[] = [
@@ -94,8 +100,14 @@ export function createDemoGateway(): Gateway {
     async listStores() {
       return clone(DEMO_STORES);
     },
-    async listCookies() {
-      return clone(cookies);
+    async listCookies(options = {}) {
+      return clone(
+        cookies.filter(
+          (cookie) =>
+            (!options.storeIds || options.storeIds.includes(cookie.storeId)) &&
+            (!options.host || domainMatches(cookie, options.host)),
+        ),
+      );
     },
     async saveCookie(cookie, original) {
       const errors = validateCookie(cookie).filter((issue) => issue.severity === 'error');

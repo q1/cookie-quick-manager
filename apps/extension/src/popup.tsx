@@ -5,7 +5,7 @@ import { Popup } from './ui/Popup';
 import './ui/styles.css';
 
 createRoot(document.getElementById('root')!).render(
-  <WorkspaceProvider gateway={browserGateway}>
+  <WorkspaceProvider gateway={browserGateway} scope="site">
     <Popup />
   </WorkspaceProvider>,
 );

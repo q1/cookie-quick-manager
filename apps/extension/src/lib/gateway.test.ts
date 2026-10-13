@@ -73,7 +73,12 @@ function fixture(initial: CookieRecord[] = [], firefox = false) {
   const matches = (item: CookieRecord, details: Record<string, unknown>) => {
     if (details.storeId !== undefined && item.storeId !== details.storeId) return false;
     if (details.name !== undefined && item.name !== details.name) return false;
-    if (details.domain !== undefined && cookieDomain(item.domain) !== details.domain) return false;
+    if (
+      typeof details.domain === 'string' &&
+      cookieDomain(item.domain) !== details.domain &&
+      !cookieDomain(item.domain).endsWith(`.${details.domain}`)
+    )
+      return false;
     if (details.path !== undefined && item.path !== details.path) return false;
     if (
       details.firstPartyDomain !== undefined &&
@@ -266,6 +271,80 @@ describe('browser gateway', () => {
     f.denyHostAccess();
     await expect(f.gateway.listCookies()).rejects.toThrow('Allow website access');
     expect(f.api.cookies.getAll).not.toHaveBeenCalled();
+  });
+
+  for (const firefox of [false, true]) {
+    it(`scopes site reads without losing parent domains, paths, or partitions (${firefox ? 'Firefox' : 'Chromium'})`, async () => {
+      const storeId = firefox ? 'firefox-default' : '0';
+      const parent = cookie({ domain: '.example.com', hostOnly: false, storeId });
+      const path = cookie({ domain: 'app.example.com', path: '/account', storeId });
+      const partition = cookie({
+        domain: 'app.example.com',
+        storeId,
+        partitionKey: { topLevelSite: 'https://first.test', hasCrossSiteAncestor: true },
+      });
+      const fpi = cookie({
+        domain: 'app.example.com',
+        name: 'fpi',
+        storeId,
+        ...(firefox ? { firstPartyDomain: 'first.test' } : {}),
+      });
+      const f = fixture(
+        [
+          parent,
+          path,
+          partition,
+          fpi,
+          cookie({ domain: 'example.com', hostOnly: true, storeId }),
+          cookie({ domain: 'other.example.com', storeId }),
+          cookie({ domain: 'app.example.com', storeId: 'another-store' }),
+        ],
+        firefox,
+      );
+      const result = await f.gateway.listCookies({ storeIds: [storeId], host: 'app.example.com' });
+      expect(result.map((item) => item.name)).toHaveLength(4);
+      expect(result.some((item) => item.path === '/account')).toBe(true);
+      expect(result.some((item) => item.partitionKey?.hasCrossSiteAncestor)).toBe(true);
+      expect(result.every((item) => item.storeId === storeId)).toBe(true);
+      expect(result.some((item) => item.domain === 'example.com')).toBe(false);
+      expect(result.some((item) => item.domain === 'other.example.com')).toBe(false);
+      expect(f.api.cookies.getAllCookieStores).not.toHaveBeenCalled();
+      f.denyHostAccess();
+      await expect(
+        f.gateway.listCookies({ storeIds: [storeId], host: 'app.example.com' }),
+      ).rejects.toThrow('Allow website access');
+    });
+  }
+
+  for (const host of ['127.0.0.1', '[::1]', 'localhost']) {
+    it(`does not query parent fragments of ${host}`, async () => {
+      const f = fixture([cookie({ domain: host })]);
+      expect(await f.gateway.listCookies({ storeIds: ['0'], host })).toHaveLength(1);
+      expect(f.api.cookies.getAll).toHaveBeenCalledTimes(1);
+      expect(f.api.cookies.getAll).toHaveBeenCalledWith({
+        storeId: '0',
+        domain: host,
+        partitionKey: {},
+      });
+    });
+  }
+
+  it('checks an edited identity without enumerating the entire browser profile', async () => {
+    const original = cookie();
+    const f = fixture([original, cookie({ name: 'unrelated' })]);
+    await f.gateway.saveCookie({ ...original, value: 'changed' }, original);
+    expect(f.api.cookies.getAllCookieStores).not.toHaveBeenCalled();
+    expect(
+      mocked(f.api.cookies.getAll).mock.calls.every(([details]) => details.name === original.name),
+    ).toBe(true);
+  });
+
+  it('retains parent localhost domain cookies for a development subdomain', async () => {
+    const parent = cookie({ domain: '.localhost', hostOnly: false, path: '/account' });
+    const f = fixture([parent, cookie({ domain: 'localhost', hostOnly: true })]);
+    expect(await f.gateway.listCookies({ storeIds: ['0'], host: 'app.localhost' })).toEqual([
+      parent,
+    ]);
   });
 
   it('blocks mutations when host access has been revoked after loading cookies', async () => {

@@ -109,6 +109,45 @@ function resourceChecker(files, platform) {
   };
 }
 
+// Raw bytes matter for installed size and JS parsing; ZIP bytes matter for delivery.
+// Keep these explicit so future feature work reviews any increase.
+function verifySizeBudgets(files, platform) {
+  const total = [...files.values()].reduce((sum, file) => sum + file.length, 0);
+  const javascript = [...files]
+    .filter(([path]) => path.endsWith('.js'))
+    .reduce((sum, [, file]) => sum + file.length, 0);
+  check(total <= 235_000, `${platform}: installed size ${total} exceeds 235000 bytes.`);
+  check(javascript <= 145_000, `${platform}: JavaScript ${javascript} exceeds 145000 bytes.`);
+  for (const [page, budget] of [
+    ['popup', 55_000],
+    ['workbench', 85_000],
+  ]) {
+    const seen = new Set();
+    function visit(path) {
+      if (seen.has(path)) return;
+      seen.add(path);
+      const source = files.get(path)?.toString('utf8');
+      check(source !== undefined, `${platform}: size graph references missing ${path}.`);
+      for (const match of source.matchAll(
+        /(?:^|;)\s*(?:import|export)[\s{*][^;]*?\bfrom\s*["']([^"']+)["']/g,
+      ))
+        visit(posix.normalize(posix.join(posix.dirname(path), match[1])));
+      for (const match of source.matchAll(/(?:^|;)\s*import\s*["']([^"']+)["']/g))
+        visit(posix.normalize(posix.join(posix.dirname(path), match[1])));
+    }
+    const html = files.get(`${page}.html`).toString('utf8');
+    for (const match of html.matchAll(/(?:src|href)=["']\/?([^"']+\.js)["']/g)) visit(match[1]);
+    check(seen.size > 0, `${platform}: no initial ${page} scripts found.`);
+    const bytes = [...seen].reduce((sum, path) => sum + files.get(path).length, 0);
+    check(
+      bytes <= budget,
+      `${platform}: initial ${page} JavaScript ${bytes} exceeds ${budget} bytes.`,
+    );
+    console.log(`${platform}: initial ${page} JavaScript ${bytes}/${budget} bytes.`);
+  }
+  console.log(`${platform}: installed ${total}/235000, JavaScript ${javascript}/145000 bytes.`);
+}
+
 function checkManifestResources(manifest, requireResource) {
   const icons = (value, label) => {
     if (!value) return;
@@ -164,7 +203,7 @@ function checkBundledCode(files, requireResource, platform) {
     [/(?:["'`]bun:|\bBun\.)/, 'Bun-only runtime or test code'],
     [/(?:^|[\s/"'`])node_modules\//, 'unbundled node_modules path'],
     [
-      /(?:@vite\/client|@react-refresh|react-refresh\/|__vite_plugin_react_preamble_installed__|import\.meta\.hot|__WXT_DEV_SERVER)/,
+      /(?:@vite\/client|@react-refresh|react-refresh\/|__vite_plugin_react_preamble_installed__|prefresh|import\.meta\.hot|__WXT_DEV_SERVER)/,
       'development runtime',
     ],
     [/(?:react|react-dom|react-jsx-runtime)\.development\.(?:js|cjs)/, 'development React build'],
@@ -339,7 +378,7 @@ async function verify(platform) {
     requireResource(page, 'required UI');
     check(
       files.get(page).toString('utf8').includes('id="root"'),
-      `${platform}: ${page} is missing the React mount point.`,
+      `${platform}: ${page} is missing the UI mount point.`,
     );
   }
   for (const file of ['LICENSE', 'NOTICE', 'PRIVACY.md', 'THIRD_PARTY_NOTICES.md']) {
@@ -370,6 +409,7 @@ async function verify(platform) {
     );
   }
   checkBundledCode(files, requireResource, platform);
+  verifySizeBudgets(files, platform);
   return { platform, manifest, count: files.size };
 }
 

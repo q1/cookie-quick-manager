@@ -23,6 +23,9 @@ for (const name of names) {
       throw new Error(`${browser}: archived manifest differs from the verified build.`);
   }
   const contents = await readFile(join(output, name));
+  const budget = name.endsWith('-sources.zip') ? 500_000 : 95_000;
+  if (contents.length > budget)
+    throw new Error(`${name}: ${contents.length} bytes exceeds the ${budget}-byte package budget.`);
   assets.push({
     name,
     bytes: contents.length,

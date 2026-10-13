@@ -1,6 +1,6 @@
 # Browser-store submission kit
 
-Prepared for the `0.1.0` desktop preview. This is listing copy and reviewer
+Prepared for the `0.1.1` desktop preview. This is listing copy and reviewer
 guidance, not a submitted or approved listing. The publisher must use their own
 developer accounts; Cookie Loom has a separate identity from Cookie Quick Manager.
 
@@ -70,9 +70,9 @@ and the current store definitions; the publisher makes the final declarations.
 
 ## Uploads and images
 
-- Chromium: upload `cookie-loom-0.1.0-chrome.zip` as a new item.
-- Firefox: upload `cookie-loom-0.1.0-firefox.zip` under the stable new ID
-  `cookie-loom@q1.github.io`; provide `cookie-loom-0.1.0-sources.zip` when asked
+- Chromium: upload `cookie-loom-0.1.1-chrome.zip` as a new item.
+- Firefox: upload `cookie-loom-0.1.1-firefox.zip` under the stable new ID
+  `cookie-loom@q1.github.io`; provide `cookie-loom-0.1.1-sources.zip` when asked
   for original source. Do not upload under Cookie Quick Manager's ID.
 - Use [store assets](store-assets/) for the required 1280×800 screenshot and
   440×280 promotional image. They show the actual UI with synthetic data.
@@ -105,9 +105,9 @@ Source build: install Bun 1.4.3, extract the source ZIP, run
 `bun run build`. Outputs are `apps/extension/.output/chrome-mv3` and
 `apps/extension/.output/firefox-mv3`. Builds include `bun.lock`, `bunfig.toml`,
 `.bun-version`, and the pinned tooling patch, and need no publisher credentials.
-The two known Firefox validator warnings are bundled
-React's `innerHTML` implementation; the application renders cookie text through
-React and does not inject cookie HTML. See [development notes](development.md).
+The one known Firefox validator warning comes from bundled
+Preact's `innerHTML` implementation; the application renders cookie text through
+Preact and does not inject cookie HTML. See [development notes](development.md).
 
 ## Final publisher steps
 

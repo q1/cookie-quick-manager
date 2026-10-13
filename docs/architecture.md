@@ -4,12 +4,20 @@ Cookie Loom is one extension with two browser builds. The popup handles quick
 current-site tasks; the workbench provides space for inspection, editing,
 search, transfers, and settings. Both use the same cookie model and services.
 
-## Decision: TypeScript, React, WXT, Bun workspaces
+## Decision: TypeScript, Preact, WXT, Bun workspaces
 
 **Status:** workspace split accepted for the rewrite on 2026-10-08; toolchain
 migrated to Bun 1.4.3 on 2026-10-12.
 
-- `apps/extension` owns the React interface, extension entrypoints, browser
+The 0.1.1 optimization pass replaces React DOM with Preact 11.0.1 and its
+compatibility layer. The same typed component and Lucide APIs remain, with
+React imports aliased by the official Preact Vite preset in both builds and
+the demo. React is installed for the icon library's peer contract; React DOM
+and the React WXT module are removed, and React runtime code is not bundled.
+Native browser and keyboard/focus regressions gate this renderer choice.
+See [the measured comparison](extension-performance.md).
+
+- `apps/extension` owns the Preact interface, extension entrypoints, browser
   adapter, manifests, assets, and synthetic-data demo.
 - `packages/core` owns cookie identity, validation, filters, import/export,
   cleanup selection, and browser-independent behavior.
@@ -22,7 +30,7 @@ migrated to Bun 1.4.3 on 2026-10-12.
   material. It is excluded from new application builds and active checks.
 
 This split makes destructive behavior testable without a browser while keeping
-browser permissions and API differences visible at their boundary. React
+browser permissions and API differences visible at their boundary. Preact
 provides a common accessible component model; WXT handles extension entrypoints
 and build packaging. Bun runs WXT/Vite and the maintenance scripts; the shipped
 extension uses each browser's JavaScript engine. The tradeoff is a build pipeline
@@ -35,6 +43,21 @@ emitting browser code. Native Bun tests replace Vitest; Playwright and the
 Firefox harness verify compiled browser behavior. `run.noOrphans` also keeps
 development child processes tied to their supervisor. See
 [development details](development.md) and [toolchain measurements](toolchain-performance.md).
+
+The popup reads only its captured tab's store and applicable host scope.
+Parent-domain queries preserve cookies on every path, with a final host-only
+and domain-applicability filter; partitions and Firefox FPI remain distinct.
+The workbench reads every accessible store, reusing the current refresh's
+store enumeration. Cookie edits validate the exact namespace instead of
+enumerating the whole profile. Mutation serialization and stale-write checks
+remain required.
+
+Domain summaries and the identity index are computed once per cookie snapshot.
+The sidebar shows 50 domains at a time, with search and incremental expansion;
+the selected domain remains visible. The mobile domain selector is mounted
+only at the CSS breakpoint. Editor, transfers, copy tools, and settings load
+from local chunks on demand. Draft guards and dialog focus use layout effects
+so deferred effects cannot allow a quick navigation to discard unsaved data.
 
 ## Cookie identity
 

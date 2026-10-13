@@ -253,6 +253,12 @@ void (async () => {
       ),
       'FPI cookie missing from enumeration.',
     );
+    assert(
+      (await gateway.listCookies({ storeIds: ['firefox-default'], host: 'app.localhost' })).some(
+        (cookie) => cookieKey(cookie) === cookieKey(isolated),
+      ),
+      'Site read lost FPI identity.',
+    );
   });
   await check('native Firefox partition identity survives create, edit and remove', async () => {
     let partitioned = await gateway.saveCookie(
@@ -270,12 +276,52 @@ void (async () => {
       (await gateway.listCookies()).some((cookie) => cookieKey(cookie) === cookieKey(partitioned)),
       'Partitioned cookie missing from enumeration.',
     );
+    assert(
+      (await gateway.listCookies({ storeIds: ['firefox-default'], host: 'app.localhost' })).some(
+        (cookie) => cookieKey(cookie) === cookieKey(partitioned),
+      ),
+      'Site read lost partition identity.',
+    );
     const result = await gateway.deleteCookies([partitioned]);
     assert(
       result.deleted.length === 1 && result.failed.length === 0,
       'Partitioned cookie could not be removed.',
     );
   });
+  await check(
+    'native site reads retain parent-domain paths and exclude siblings and stores',
+    async () => {
+      const parent = await gateway.saveCookie(
+        seed({
+          name: 'loom_site_parent',
+          domain: '.example.test',
+          hostOnly: false,
+          path: '/account',
+        }),
+      );
+      await gateway.saveCookie(seed({ name: 'loom_site_sibling', domain: 'other.example.test' }));
+      await gateway.saveCookie(seed({ name: 'loom_site_parent_host', domain: 'example.test' }));
+      const scoped = await gateway.listCookies({
+        storeIds: ['firefox-default'],
+        host: 'app.example.test',
+      });
+      assert(
+        scoped.some((cookie) => cookieKey(cookie) === cookieKey(parent)),
+        'Parent path was lost.',
+      );
+      assert(
+        !scoped.some(
+          (cookie) =>
+            cookie.name === 'loom_site_sibling' || cookie.name === 'loom_site_parent_host',
+        ),
+        'Site read included a non-applicable host cookie.',
+      );
+      assert(
+        scoped.every((cookie) => cookie.storeId === 'firefox-default'),
+        'Site read crossed stores.',
+      );
+    },
+  );
   const container = await browser.contextualIdentities.create({
     name: 'Cookie Loom smoke',
     color: 'blue',

@@ -70,6 +70,14 @@ the retained editor TypeScript compiler both passed the extension/core projects.
 The [performance record](toolchain-performance.md) reports measured development
 latency; it makes no claim about JavaScript speed inside the browser extension.
 
+The 0.1.1 optimization pass adds seven adapter regressions (153 Bun tests),
+one native Chromium large-profile/popup workflow (58 browser tests, four native
+Chrome workflows), and one native Firefox scoped-read check (14 native Firefox
+checks). See [the optimization review](review-2026-10-12-optimization.md) and
+[Chromium performance measurements](extension-performance.md). Required CI
+runs the compiled workflows on Chrome 132 and Firefox 140 as well as modern
+browsers. One reviewed Preact vendor warning replaces the previous React warnings.
+
 These results are not store review or a compatibility certification. Native
 permission dialogs, signed installation/update paths, real private-window UI,
 and mobile browsers still need separate verification. Mobile is not a release

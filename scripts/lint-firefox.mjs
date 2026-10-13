@@ -23,10 +23,10 @@ try {
   throw new Error(`Firefox linter did not return JSON: ${result.stderr}`);
 }
 
-// React DOM contains two internal innerHTML assignments, including its implementation
-// of dangerouslySetInnerHTML. Application data always uses React text nodes. Keep
+// Preact 11.0.1 contains one innerHTML assignment in src/diff/index.js:669 for
+// its dangerouslySetInnerHTML implementation. Application data uses text nodes. Keep
 // framework code in a dedicated chunk, prohibit these sinks in our source, and
-// reject every other linter warning. A React update that changes the count needs review.
+// reject every other linter warning. A framework update that changes the count needs review.
 function verifyTextOnlySource(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const path = resolve(directory, entry.name);
@@ -45,11 +45,10 @@ function verifyTextOnlySource(directory) {
 verifyTextOnlySource(resolve(root, 'apps/extension/src'));
 const frameworkWarnings = report.warnings.filter(
   (warning) =>
-    warning.code === 'UNSAFE_VAR_ASSIGNMENT' &&
-    /^chunks\/react-vendor-[\w-]+\.js$/.test(warning.file),
+    warning.code === 'UNSAFE_VAR_ASSIGNMENT' && /^chunks\/ui-vendor-[\w-]+\.js$/.test(warning.file),
 );
 const unexpected = report.warnings.filter((warning) => !frameworkWarnings.includes(warning));
-if (report.errors.length || unexpected.length || frameworkWarnings.length > 2) {
+if (report.errors.length || unexpected.length || frameworkWarnings.length > 1) {
   console.error(
     JSON.stringify({ errors: report.errors, warnings: unexpected, frameworkWarnings }, null, 2),
   );
@@ -59,5 +58,5 @@ console.log(
   `Firefox validation passed: ${report.errors.length} errors, ${unexpected.length} unexpected warnings.`,
 );
 console.log(
-  `${frameworkWarnings.length} reviewed React DOM innerHTML warnings in the isolated vendor chunk.`,
+  `${frameworkWarnings.length} reviewed Preact innerHTML warning in the isolated vendor chunk.`,
 );

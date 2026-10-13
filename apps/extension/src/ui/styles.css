@@ -1596,3 +1596,7 @@ dialog.inspector::backdrop {
     scroll-behavior: auto !important;
   }
 }
+.domain-more {
+  margin: 8px 10px;
+  font-size: 12px;
+}

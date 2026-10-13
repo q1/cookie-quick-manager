@@ -24,12 +24,19 @@ export interface DeleteResult {
   failed: { cookie: CookieRecord; error: string }[];
 }
 
+export interface CookieReadOptions {
+  /** Known stores from this refresh; omitted by background callers. */
+  storeIds?: string[];
+  /** Include every path and parent-domain cookie that applies to this host. */
+  host?: string;
+}
+
 export interface Gateway {
   readonly kind: 'browser' | 'demo';
   getStatus(): Promise<GatewayStatus>;
   requestHostAccess(): Promise<boolean>;
   listStores(): Promise<CookieStore[]>;
-  listCookies(): Promise<CookieRecord[]>;
+  listCookies(options?: CookieReadOptions): Promise<CookieRecord[]>;
   saveCookie(cookie: CookieRecord, original?: CookieRecord): Promise<CookieRecord>;
   deleteCookies(cookies: CookieRecord[]): Promise<DeleteResult>;
   getPreferences(): Promise<Preferences>;

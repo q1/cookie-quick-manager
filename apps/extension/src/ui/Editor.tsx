@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { cookieKey, validateCookie, type CookieRecord } from '@cookie-loom/core';
 import { X, Eye, EyeOff, Copy, Check, Trash2 } from 'lucide-react';
 import { useWorkspace } from './context';
@@ -88,25 +88,27 @@ export function CookieEditor({
     });
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     onDirtyChange?.(dirty);
     return () => onDirtyChange?.(false);
   }, [dirty, onDirtyChange]);
-  useEffect(() => () => onSavingChange?.(false), [onSavingChange]);
+  useLayoutEffect(() => () => onSavingChange?.(false), [onSavingChange]);
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1180px)');
     const change = () => setCompact(media.matches);
     media.addEventListener('change', change);
     return () => media.removeEventListener('change', change);
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!compact) return;
     const modal = dialog.current;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     modal?.showModal();
     return () => {
       modal?.close();
-      opener?.focus();
+      queueMicrotask(() => {
+        if (opener?.isConnected) opener.focus();
+      });
     };
   }, [compact]);
   useEffect(() => {
@@ -114,7 +116,7 @@ export function CookieEditor({
     const timer = setTimeout(() => setCopied(false), 1800);
     return () => clearTimeout(timer);
   }, [copied]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!dirty) return;
     const preventUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -129,7 +131,7 @@ export function CookieEditor({
     if (dirty) setDiscardAction(() => action);
     else action();
   }
-  useEffect(() => {
+  useLayoutEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       const open = [...document.querySelectorAll('dialog[open]')];

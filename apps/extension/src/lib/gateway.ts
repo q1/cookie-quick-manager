@@ -2,6 +2,7 @@ import {
   cookieDomain,
   cookieKey,
   cookieUrl,
+  domainMatches,
   validateCookie,
   type CookieRecord,
   type CookieStore,
@@ -278,26 +279,45 @@ export function createGateway(
       }
       return [...result.values()];
     },
-    async listCookies() {
+    async listCookies(options = {}) {
       await requireAccess();
-      const stores = await gateway.listStores();
+      const storeIds = options.storeIds ?? (await gateway.listStores()).map((store) => store.id);
+      const host = options.host?.toLowerCase().replace(/\.$/, '');
+      // getAll({url}) misses cookies on other paths. Domain queries preserve those,
+      // with explicit parent queries for domain cookies and a final applicability filter.
+      const domains: (string | undefined)[] = host
+        ? /^\d+(\.\d+){3}$/.test(host) || host.includes(':')
+          ? [host]
+          : host
+              .split('.')
+              .map((_, index, parts) => parts.slice(index).join('.'))
+              .filter(
+                (domain, index) => index === 0 || domain.includes('.') || domain === 'localhost',
+              )
+        : [undefined];
       // Empty partitionKey enumerates both partitioned and unpartitioned cookies.
       // Firefox additionally needs firstPartyDomain:null to include FPI cookies.
       const groups = await Promise.all(
-        stores.map((store) =>
-          api.cookies.getAll({
-            storeId: store.id,
-            partitionKey: {},
-            ...(firefox ? { firstPartyDomain: null } : {}),
-          }),
+        storeIds.flatMap((storeId) =>
+          domains.map((domain) =>
+            api.cookies.getAll({
+              storeId,
+              ...(domain ? { domain } : {}),
+              partitionKey: {},
+              ...(firefox ? { firstPartyDomain: null } : {}),
+            }),
+          ),
         ),
       );
       return [
         ...new Map(
-          groups.flat().map((cookie) => {
-            const normalized = forBrowser(cookie);
-            return [cookieKey(normalized), normalized] as const;
-          }),
+          groups
+            .flat()
+            .filter((cookie) => !host || domainMatches(cookie, host))
+            .map((cookie) => {
+              const normalized = forBrowser(cookie);
+              return [cookieKey(normalized), normalized] as const;
+            }),
         ).values(),
       ];
     },
@@ -324,7 +344,10 @@ export function createGateway(
           throw failure('A cookie already exists at this name, domain, path, store and partition.');
         }
         if (original) {
-          const cookies = await gateway.listCookies();
+          const cookies =
+            baseIdentity(forBrowser(original)) === baseIdentity(candidate)
+              ? before
+              : await candidateScope(forBrowser(original));
           const current = cookies.find((item) => cookieKey(item) === originalKey);
           if (!current || !equivalent(current, forBrowser(original)))
             throw failure('This cookie changed in the browser. Refresh before saving.');
